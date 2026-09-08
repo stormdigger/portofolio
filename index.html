@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0d0e">
+  <meta name="description" content="An interactive story about curiosity, building, and becoming an engineer. The portfolio of Balwinder Singh, Software Development Engineer.">
+  <title>A question, then everything. | Balwinder Singh</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preload" as="image" href="assets/room.webp">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="experience.css">
+</head>
+<body>
+  <a class="skip-link" href="#archive">Skip to projects</a>
+  <div id="prologue" aria-hidden="true"><span>_</span></div>
+  <div id="stage" aria-hidden="true">
+    <div id="room" class="room"></div>
+    <canvas id="world"></canvas>
+    <div class="vignette"></div>
+    <div class="grain"></div>
+    <div class="frame-corner corner-tl"></div><div class="frame-corner corner-br"></div>
+  </div>
+  <div id="world-word" aria-hidden="true">CURIOSITY</div>
+  <div class="universe-index" aria-hidden="true"><span>MEMORY COORDINATES</span><b id="coordinate">000.000</b><i></i><span>ONE QUESTION / MANY WORLDS</span></div>
+  <button id="disassemble" aria-pressed="false"><span class="disassemble-icon" aria-hidden="true">⌘</span><span id="disassemble-label">HOLD SPACE TO PULL APART</span><span class="hold-meter" aria-hidden="true"></span></button>
+  <div id="portal-cursor" aria-hidden="true">ENTER WORLD ↗</div>
+  <div class="graphics-message">The 3D scene is unavailable. The story and <button onclick="document.getElementById('quick-view').click()">professional view</button> remain accessible.</div>
+  <header class="film-header">
+    <a href="#curiosity" class="film-mark" aria-label="Return to the beginning"><span class="mark-icon">[<i></i>]</span><span>A STORY OF CURIOSITY</span></a>
+    <div class="header-actions"><button id="sound" aria-pressed="false"><span class="sound-bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span id="sound-label">SOUND OFF</span></button><button id="quick-view">QUICK VIEW <span aria-hidden="true">↗</span></button></div>
+  </header>
+  <main id="story"></main>
+  <nav class="film-footer" aria-label="Story chapters">
+    <button id="chapter-toggle" aria-expanded="false" aria-controls="chapter-menu"><span class="live-dot"></span><span id="chapter-number">01 / 12</span><span id="chapter-name">THE ROOM</span><span aria-hidden="true">⌃</span></button>
+    <div class="timeline" id="timeline"></div>
+    <span class="journey-progress"><span id="progress-number">00</span>% <span class="muted">OF THE STORY</span></span>
+  </nav>
+  <div id="chapter-menu" class="chapter-menu" hidden></div>
+  <dialog id="detail-dialog" aria-labelledby="detail-title"><div class="dialog-top"><button id="detail-back">← BACK TO ARCHIVE</button><span>PROJECT NOTES</span></div><div id="detail-content"></div></dialog>
+  <dialog id="quick-dialog" aria-labelledby="quick-title"><div class="dialog-top"><span>THE PROFESSIONAL VIEW</span><button id="quick-close">CONTINUE STORY <span aria-hidden="true">↘</span></button></div><div id="quick-content"></div></dialog>
+  <noscript><div class="no-script">This interactive story uses JavaScript. <a href="resume.html">Read Balwinder's professional profile instead →</a></div></noscript>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
