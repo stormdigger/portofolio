@@ -1,17 +1,25 @@
-import { mkdir, copyFile, cp, stat } from 'node:fs/promises';
+import { mkdir, copyFile, cp, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const output = resolve(root, 'dist');
-for (const name of ['app.js','world.js','universe.js','data.js']) {
+
+const MODULES = ['app.js', 'data.js', 'diagrams.js', 'hero3d.js'];
+const FILES = [...MODULES, 'index.html', 'styles.css', 'resume.html'];
+
+for (const name of MODULES) {
   execFileSync(process.execPath, ['--check', resolve(root, name)], { stdio: 'inherit' });
 }
+
+await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
-for (const name of ['index.html','styles.css','experience.css','app.js','world.js','universe.js','data.js','resume.html']) {
+
+for (const name of FILES) {
   await copyFile(resolve(root, name), resolve(output, name));
 }
+
 await cp(resolve(root, 'assets'), resolve(output, 'assets'), { recursive: true });
-const image = await stat(resolve(output, 'assets/room.webp'));
-console.log(`Built static site in portofolio/dist. Room image: ${Math.round(image.size / 1024)} KB.`);
+
+console.log(`Built static site in portofolio/dist (${FILES.length} files + assets).`);

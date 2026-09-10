@@ -1,13 +1,279 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Balwinder Singh | Professional profile</title>
-<style>*{box-sizing:border-box}body{font:14px/1.6 Arial,sans-serif;color:#222;background:#f2f1ed;margin:0}main{max-width:900px;margin:40px auto;background:white;padding:55px 65px}h1{font-size:35px;margin:0}h2{font-size:14px;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid #bbb;padding-bottom:7px;margin-top:26px}h3{font-size:15px;margin-bottom:5px}p{margin:5px 0 12px}a{color:#235663}small{color:#555}.links{display:flex;flex-wrap:wrap;gap:20px;font-size:12px;margin-top:15px}.toolbar{max-width:900px;margin:25px auto;display:flex;justify-content:space-between;align-items:center;padding:0 15px}.toolbar button{background:#17262c;color:white;border:0;padding:13px 22px;cursor:pointer;font:inherit}ul{padding-left:20px}.skills{font-size:12px}@media(max-width:650px){main{margin:15px;padding:25px}h1{font-size:29px}.links{gap:10px}}@media print{body{background:white;font-size:10px}main{max-width:none;margin:0;padding:0}.toolbar{display:none}h1{font-size:27px}h2{margin-top:15px;font-size:11px}h3{font-size:12px}p{margin-bottom:6px}.skills,.links{font-size:9px}a{color:#222;text-decoration:none}section{break-inside:avoid}@page{size:A4;margin:16mm}}</style></head>
-<body><div class="toolbar"><a href="index.html">← Back to the story</a><button onclick="window.print()">Print / Save as PDF</button></div><main>
-<header><h1>Balwinder Singh</h1><p>Software Development Engineer · Punjab, India</p><div class="links"><a href="mailto:1231262balwindersingh@gmail.com">1231262balwindersingh@gmail.com</a><a href="https://github.com/stormdigger">github.com/stormdigger</a><a href="https://linkedin.com/in/balwinder-singh-518179225">LinkedIn</a><a href="https://leetcode.com/KingHagemaru">LeetCode / KingHagemaru</a></div></header>
-<section><h2>Experience</h2><h3>Software Development Engineer · Arovita Care</h3><p><small>November 2025 to present · Remote</small></p><ul><li>Engineering core modules of Arovita HMS, a multi-tenant Hospital Management System, with AWS Lambda, API Gateway, and PostgreSQL.</li><li>Responsive role-based dashboards for doctors, nurses, receptionists, and patients. Work across OPD/IPD, appointments, EMR, prescriptions, billing, and telemedicine.</li><li>AWS Cognito, JWT, and MFA authentication. API integration and Agora SDK for real-time video and audio. Camera-based heart-rate monitoring.</li><li>Collaboration with backend engineers, designers, and QA on API design, UX, and the SDLC.</li></ul></section>
-<section><h2>Projects</h2><h3>AgriStore · 2025</h3><p>Full-stack e-commerce platform for farmers. Role-based authentication, product management, automated PDF invoices, AWS deployment, and SQL query tuning.</p><p class="skills">Spring Boot · Thymeleaf · MySQL · AWS Elastic Beanstalk · EC2 · S3 · RDS</p><h3>DoctorG · 2024</h3><p>Multimodal AI medical-assistant project with voice conversations, image analysis, conversational responses, and a low-latency interaction loop.</p><p class="skills">Flask · Groq API · Llama 3 Vision · Whisper · ElevenLabs</p><h3>FaceMeet · 2023</h3><p>Video conferencing with facial-recognition authentication, real-time communication, secure session management, and backend workflow optimization.</p><p class="skills">Python · Flask · MySQL · Bootstrap · dlib · VideoSDK</p></section>
-<section><h2>Research</h2><h3>Comparative Study of YOLOv8, Faster R-CNN & SSD in Traffic Sign Detection</h3><p><small>IEEE · 2025</small><br>Object-detection benchmarking, traffic signs, GPS feedback, monitoring, and autonomous-driving deployment context.</p><h3>Login Confirmation Mechanism for Meeting Platforms</h3><p><small>IEEE · 2024</small><br>Facial recognition and participant authentication, including accuracy, latency, robustness, and real-world conditions.</p></section>
-<section><h2>Education</h2><h3>B.E. Computer Science and Engineering · Chandigarh University</h3><p>August 2021 to May 2025 · CGPA 8.0 / 10<br>Best Project of the Semester, Final Year CS Project</p><p class="skills">Data Structures & Algorithms · OOP · DBMS · Operating Systems · Computer Networks · System Design</p></section>
-<section><h2>Technical skills</h2><p class="skills"><b>Languages:</b> Java, Python, JavaScript, Dart, C++, C, SQL<br><b>Frontend:</b> React.js, Flutter, HTML5, CSS3, Bootstrap<br><b>Backend:</b> Spring Boot, Flask, REST APIs<br><b>Databases:</b> PostgreSQL, MySQL, MongoDB<br><b>Cloud:</b> AWS Lambda, API Gateway, Cognito, EC2, S3, RDS, Docker<br><b>AI and tools:</b> OpenCV, YOLOv8, Groq API, OpenAI API, Git, Postman</p></section>
-<section><h2>Achievements and certifications</h2><p>AIR 53 · National Source-O-Code Competitive Programming Contest<br>11th place · Celebal Anaverse Competition<br>Best Project of the Semester · Final Year CS Project</p><p class="skills">Introduction to Cloud Computing · Coursera<br>React JS · Great Learning<br>Introduction to Programming Through C++ · NPTEL</p></section>
-</main></body></html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Balwinder Singh — Résumé</title>
+<meta name="description" content="Printable résumé for Balwinder Singh, Software Development Engineer.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<style>
+  :root {
+    --paper: #fdf8f3;
+    --ink: #211a15;
+    --ink-2: #5b4f45;
+    --ink-3: #8a7b6d;
+    --accent: #f2604a;
+    --line: #e7dacb;
+    --sans: 'DM Sans', system-ui, -apple-system, Segoe UI, sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 15px/1.6 var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .bar {
+    max-width: 880px;
+    margin: 22px auto 0;
+    padding: 0 24px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .bar a, .bar button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 11px 20px;
+    border-radius: 999px;
+    font: 600 14px var(--sans);
+    cursor: pointer;
+    border: 1.5px solid var(--line);
+    background: #fff;
+    color: var(--ink);
+    text-decoration: none;
+    transition: transform .2s, border-color .2s;
+  }
+
+  .bar button { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .bar a:hover, .bar button:hover { transform: translateY(-2px); border-color: var(--accent); }
+
+  main {
+    max-width: 880px;
+    margin: 20px auto 60px;
+    padding: 52px 60px 60px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    box-shadow: 0 2px 6px #4a35231a, 0 20px 50px -18px #4a35232e;
+  }
+
+  header { padding-bottom: 22px; border-bottom: 2px solid var(--ink); }
+
+  h1 {
+    margin: 0;
+    font-size: 38px;
+    font-weight: 700;
+    letter-spacing: -0.035em;
+  }
+
+  .role {
+    margin: 6px 0 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 20px;
+    margin-top: 14px;
+    font: 500 13px var(--mono);
+  }
+
+  .links a { color: var(--ink-2); text-decoration: none; }
+  .links a:hover { color: var(--accent); }
+
+  h2 {
+    margin: 30px 0 12px;
+    font: 600 12px var(--mono);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  h3 {
+    margin: 0 0 2px;
+    font-size: 16.5px;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+
+  .meta {
+    margin: 0 0 8px;
+    font: 500 12.5px var(--mono);
+    color: var(--ink-3);
+  }
+
+  p { margin: 0 0 10px; color: var(--ink-2); }
+
+  section > div + div { margin-top: 18px; }
+
+  ul { margin: 8px 0 0; padding-left: 18px; color: var(--ink-2); }
+  li { margin-bottom: 5px; }
+
+  .skills { display: grid; grid-template-columns: 130px 1fr; gap: 8px 16px; }
+  .skills dt { font-weight: 600; font-size: 14px; }
+  .skills dd { margin: 0; font: 500 13px var(--mono); color: var(--ink-2); }
+
+  @media (max-width: 680px) {
+    main { margin: 14px; padding: 28px 22px 36px; border-radius: 16px; }
+    h1 { font-size: 29px; }
+    .skills { grid-template-columns: 1fr; gap: 2px 0; }
+    .skills dd { margin-bottom: 10px; }
+  }
+
+  @media print {
+    body { background: #fff; font-size: 10.2px; line-height: 1.45; }
+    .bar { display: none; }
+    main {
+      max-width: none; margin: 0; padding: 0;
+      border: 0; border-radius: 0; box-shadow: none;
+    }
+    h1 { font-size: 22px; }
+    .role { font-size: 11px; color: #000; }
+    .links { font-size: 8.5px; gap: 3px 12px; margin-top: 8px; }
+    h2 { margin: 13px 0 6px; font-size: 8.5px; }
+    h3 { font-size: 11px; }
+    .meta { font-size: 8.5px; margin-bottom: 4px; }
+    p { margin-bottom: 5px; }
+    section, div { break-inside: avoid; }
+    a { color: #000; text-decoration: none; }
+    @page { size: A4; margin: 14mm; }
+  }
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <a href="index.html">← Back to portfolio</a>
+  <button type="button" onclick="window.print()">Print / Save as PDF</button>
+</div>
+
+<main>
+  <header>
+    <h1>Balwinder Singh</h1>
+    <p class="role">Software Development Engineer</p>
+    <div class="links">
+      <a href="mailto:1231262balwindersingh@gmail.com">1231262balwindersingh@gmail.com</a>
+      <span>Punjab, India</span>
+      <a href="https://github.com/stormdigger">github.com/stormdigger</a>
+      <a href="https://linkedin.com/in/balwinder-singh-518179225">LinkedIn</a>
+      <a href="https://leetcode.com/KingHagemaru">LeetCode</a>
+    </div>
+  </header>
+
+  <section>
+    <h2>Summary</h2>
+    <p>Software Development Engineer working on a multi-tenant Hospital Management System on AWS.
+       Backend, cloud infrastructure, and API design, with two IEEE publications in computer
+       vision and authentication.</p>
+  </section>
+
+  <section>
+    <h2>Experience</h2>
+    <div>
+      <h3>Software Development Engineer — Arovita Care</h3>
+      <p class="meta">November 2025 — Present · Remote</p>
+      <ul>
+        <li>Engineer core modules of Arovita HMS, a multi-tenant Hospital Management System.</li>
+        <li>Build serverless APIs on AWS API Gateway and Lambda backed by PostgreSQL.</li>
+        <li>Implement authentication with Cognito, JWT, and MFA across role-based dashboards
+            for doctors, nurses, receptionists, and patients.</li>
+        <li>Deliver OPD/IPD, appointments, EMR, prescriptions, and billing modules.</li>
+        <li>Integrate Agora SDK for telemedicine video and audio, plus camera-based
+            heart-rate monitoring.</li>
+        <li>Collaborate with backend engineers, designers, and QA on API design, UX, and the SDLC.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>Projects</h2>
+
+    <div>
+      <h3>AgriStore — Full-stack commerce platform</h3>
+      <p class="meta">2025 · Spring Boot · Thymeleaf · MySQL · AWS</p>
+      <p>E-commerce platform designed around farmers, with role-based authentication, product
+         management, and automated PDF invoices. Deployed on AWS using Elastic Beanstalk, EC2,
+         S3, and RDS, with SQL query tuning as the dataset grew.</p>
+    </div>
+
+    <div>
+      <h3>DoctorG — Multimodal AI assistant</h3>
+      <p class="meta">2024 · Flask · Groq · Llama 3 Vision · Whisper · ElevenLabs</p>
+      <p>Combines voice conversation, image analysis, and spoken responses. Whisper transcribes
+         speech, Llama 3 Vision analyses images through Groq, and ElevenLabs returns the reply
+         as audio — connected by Flask into a low-latency loop.</p>
+    </div>
+
+    <div>
+      <h3>FaceMeet — Authenticated video conferencing</h3>
+      <p class="meta">2023 · Python · Flask · MySQL · dlib · VideoSDK</p>
+      <p>Video conferencing with facial-recognition authentication. The backend verifies the
+         participant, establishes a secure session, and connects the call through VideoSDK.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Research</h2>
+    <div>
+      <h3>Comparative Study of YOLOv8, Faster R-CNN &amp; SSD in Traffic Sign Detection</h3>
+      <p class="meta">IEEE · 2025</p>
+      <p>Benchmarks detection approaches for GPS feedback, monitoring systems, and
+         autonomous-driving deployment.</p>
+    </div>
+    <div>
+      <h3>Login Confirmation Mechanism for Meeting Platforms</h3>
+      <p class="meta">IEEE · 2024</p>
+      <p>Examines facial recognition for participant authentication: accuracy, latency, and
+         robustness in real-world conditions.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Education</h2>
+    <div>
+      <h3>B.E. Computer Science and Engineering</h3>
+      <p class="meta">Chandigarh University · August 2021 — May 2025</p>
+      <p>CGPA 8.0 / 10 · Best Project of the Semester, Final Year CS Project.
+         Coursework: Data Structures &amp; Algorithms, OOP, DBMS, Operating Systems,
+         Computer Networks, System Design.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Skills</h2>
+    <dl class="skills">
+      <dt>Cloud</dt><dd>AWS Lambda · API Gateway · Cognito · EC2 · S3 · RDS · Docker</dd>
+      <dt>Backend</dt><dd>REST APIs · Spring Boot · Flask · JWT</dd>
+      <dt>Databases</dt><dd>PostgreSQL · MySQL · MongoDB</dd>
+      <dt>Frontend</dt><dd>React.js · Flutter · HTML5 · CSS3 · Bootstrap</dd>
+      <dt>AI &amp; vision</dt><dd>OpenCV · YOLOv8 · Groq API · OpenAI API</dd>
+      <dt>Languages</dt><dd>Java · Python · JavaScript · Dart · C++ · C · SQL</dd>
+    </dl>
+  </section>
+
+  <section>
+    <h2>Achievements &amp; certifications</h2>
+    <p>AIR 53 — National Source-O-Code Competitive Programming Contest ·
+       11th place — Celebal Anaverse Competition ·
+       Best Project of the Semester — Final Year CS Project</p>
+    <p>Introduction to Cloud Computing (Coursera) · React JS (Great Learning) ·
+       Programming Through C++ (NPTEL)</p>
+  </section>
+</main>
+
+</body>
+</html>
