@@ -250,16 +250,200 @@ img, svg, canvas { max-width: 100%; display: block; }
    Scroll reveal
    ========================================================================== */
 
+/* ==========================================================================
+   Motion — choreography for the content
+
+   motion.js only ever writes numbers into custom properties; every transform
+   below is composed here. Each property falls back to its resting value, so
+   with the script absent (or `prefers-reduced-motion`) this whole section
+   evaluates to "no transform, fully opaque" and the page is the static site.
+
+   Entrances are driven per frame and therefore carry no transition. Once an
+   element finishes arriving it gets `.is-in`, which switches transitions on so
+   that hover states animate without smearing the entrance.
+   ========================================================================== */
+
 .reveal {
-  opacity: 0;
-  transform: translateY(22px);
-  transition: opacity 0.7s var(--ease), transform 0.7s var(--ease);
-  transition-delay: var(--delay, 0ms);
+  --e: var(--enter, 1);
+  opacity: var(--e);
+  transform: translate3d(0, calc((1 - var(--e)) * 34px), 0);
 }
 
-.reveal.in {
-  opacity: 1;
-  transform: none;
+.reveal.is-in {
+  transition: opacity 0.4s var(--ease), transform 0.45s var(--ease);
+}
+
+/* --- Headings: uncovered a word at a time ------------------------------- */
+
+.w {
+  display: inline-block;
+  overflow: hidden;
+  /* Room for descenders, taken back out of the layout. */
+  padding-bottom: 0.14em;
+  margin-bottom: -0.14em;
+}
+
+.wi {
+  display: inline-block;
+  /* Each word trails the one before it, then catches up. */
+  --we: clamp(0, calc((var(--e, 1) - var(--wi, 0) * 0.055) * 2.6), 1);
+  transform: translate3d(0, calc((1 - var(--we)) * 110%), 0);
+}
+
+/* --- Chips: each lands just after the one before it --------------------- */
+
+.motion-on :is(.project-tags, .chapter-facts, .tool-tags, .certs) .tag {
+  --te: clamp(0, calc((var(--e, 1) - 0.3 - var(--i, 0) * 0.05) * 3.4), 1);
+  opacity: var(--te);
+  transform:
+    translate3d(0, calc((1 - var(--te)) * 12px), 0)
+    scale(calc(0.88 + var(--te) * 0.12));
+}
+
+/* --- The figures in Proof rise inside their own mask -------------------- */
+
+.stat-value {
+  overflow: hidden;
+  padding-bottom: 0.08em;
+  margin-bottom: -0.08em;
+}
+
+.stat-value > span { display: block; }
+
+.motion-on .stat-value > span {
+  --ve: clamp(0, calc((var(--e, 1) - 0.25) * 3), 1);
+  transform: translate3d(0, calc((1 - var(--ve)) * 118%), 0);
+}
+
+/* --- The rule before each eyebrow draws itself -------------------------- */
+
+.motion-on .eyebrow::before {
+  transform-origin: left center;
+  transform: scaleX(clamp(0, calc((var(--e, 1) - 0.1) * 2.4), 1));
+}
+
+/* --- The project number drifts against its own row --------------------- */
+
+.motion-on .project-index {
+  display: inline-block;
+  transform: translate3d(0, calc((var(--p, 0.5) - 0.5) * -14px), 0);
+}
+
+/* --- Project rows: rise, and grow into their own edges ------------------ */
+
+.motion-on .project {
+  transform: translate3d(0, calc((1 - var(--e)) * 62px + var(--lift, 0px)), 0);
+}
+
+/* The wipe only applies on the way in. Left on afterwards it would clip the
+   card's own drop shadow away. */
+.motion-on .project:not(.is-in) {
+  clip-path: inset(0 0 calc((1 - var(--e)) * 36%) 0 round var(--radius-lg));
+}
+
+/* --- Toolbox and stats: gathered at one point, then spread -------------- */
+
+.motion-on .tool-card,
+.motion-on .stat {
+  transform:
+    translate3d(
+      calc((1 - var(--e)) * var(--sx, 0) * 1px),
+      calc((1 - var(--e)) * var(--sy, 0) * 1px + var(--lift, 0px)),
+      0
+    )
+    rotate(calc((1 - var(--e)) * var(--rot, 0) * 1deg))
+    scale(calc(0.84 + var(--e) * 0.16));
+}
+
+/* --- Journey: the spine draws itself, the dots land on it --------------- */
+
+.motion-on .timeline::before {
+  transform-origin: top center;
+  transform: scaleY(var(--draw, 1));
+}
+
+/* The chapters travel sideways into place. A full-width card sliding in from
+   the right widens the page while it moves, so the travel is clipped at the
+   timeline — `clip` rather than `hidden`, which would make this a scroll
+   container and trap the spine. */
+.motion-on .timeline { overflow-x: clip; }
+
+.motion-on .chapter {
+  opacity: var(--e);
+  transform: translate3d(calc((1 - var(--e)) * 40px), 0, 0);
+}
+
+.motion-on .chapter-dot {
+  transform: scale(calc(0.34 + var(--e) * 0.66));
+}
+
+/* --- The diagram beside each project leans, and drifts ------------------ */
+
+.motion-on .project-visual {
+  transform: translate3d(0, calc((var(--p, 0.5) - 0.5) * -22px), 0);
+}
+
+.motion-on .project-visual svg {
+  transform:
+    perspective(700px)
+    rotateX(calc(var(--tx, 0) * 1deg))
+    rotateY(calc(var(--ty, 0) * 1deg));
+  transition: transform 0.5s var(--ease);
+}
+
+/* --- Scroll velocity: the capability strip leans into the movement ------ */
+
+.motion-on .marquee span {
+  transform: skewX(calc(var(--vel, 0) * -2.4deg));
+}
+
+/* --- The opening sequence ----------------------------------------------- */
+
+.hero h1 .line {
+  display: block;
+  overflow: hidden;
+  padding-bottom: 0.12em;
+  margin-bottom: -0.12em;
+}
+
+.hero h1 .line-i { display: block; }
+
+.motion-on .hero h1 .line-i { transform: translate3d(0, 112%, 0); }
+
+.motion-on .hero-copy > .status,
+.motion-on .hero-copy > .hero-lead,
+.motion-on .hero-copy > .hero-actions,
+.motion-on .hero-copy > .hero-meta,
+.motion-on .stage-badge {
+  opacity: 0;
+  transform: translate3d(0, 18px, 0);
+}
+
+.intro-ready .hero h1 .line-i {
+  animation: line-up 1s var(--ease) forwards;
+  animation-delay: calc(var(--i, 0) * 120ms + 100ms);
+}
+
+.intro-ready .hero-copy > .status,
+.intro-ready .hero-copy > .hero-lead,
+.intro-ready .hero-copy > .hero-actions,
+.intro-ready .hero-copy > .hero-meta,
+.intro-ready .stage-badge {
+  animation: intro-rise 0.85s var(--ease) forwards;
+}
+
+.intro-ready .hero-copy > .status      { animation-delay: 60ms; }
+.intro-ready .hero-copy > .hero-lead   { animation-delay: 420ms; }
+.intro-ready .hero-copy > .hero-actions{ animation-delay: 520ms; }
+.intro-ready .hero-copy > .hero-meta   { animation-delay: 620ms; }
+.intro-ready .stage-badge              { animation-delay: 760ms; }
+
+@keyframes line-up {
+  to { transform: translate3d(0, 0, 0); }
+}
+
+@keyframes intro-rise {
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
 /* ==========================================================================
@@ -666,9 +850,11 @@ img, svg, canvas { max-width: 100%; display: block; }
   transition: opacity 0.35s var(--ease);
 }
 
+/* The lift is a variable rather than a transform of its own, so it composes
+   with the entrance instead of replacing it. */
 .project:hover,
 .project:focus-within {
-  transform: translateY(-4px);
+  --lift: -6px;
   border-color: var(--tint);
   box-shadow: var(--shadow-lg);
 }
@@ -954,7 +1140,7 @@ img, svg, canvas { max-width: 100%; display: block; }
 }
 
 .tool-card:hover {
-  transform: translateY(-4px);
+  --lift: -6px;
   border-color: var(--tone);
   box-shadow: var(--shadow);
 }
@@ -1037,7 +1223,9 @@ img, svg, canvas { max-width: 100%; display: block; }
   letter-spacing: -0.015em;
 }
 
-.stat p {
+/* The figure is also a <p>, and this rule used to win on specificity and shrink
+   it back to detail-text size. Name the detail paragraphs instead. */
+.stat p:not(.stat-value) {
   margin-top: 4px;
   font-size: 13.5px;
   line-height: 1.6;

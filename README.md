@@ -40,6 +40,7 @@ npm test          # screenshots + overflow/console check at 5 viewports
 | `app.js` | Renders each section, wires the dialog, nav, scroll reveal, and hero mount |
 | `diagrams.js` | Animated inline-SVG architecture diagrams, one per project |
 | `beats.js` | The shot list: eight point arrangements, each with its camera |
+| `motion.js` | Content choreography — entrances, parallax, spread, split headings |
 | `world.js` | The rig — fixed canvas, scroll driver, damped camera, render loop |
 | `styles.css` | The whole design system: tokens, layout, components, responsive rules |
 | `index.html` | Document shell and section landmarks |
@@ -57,6 +58,15 @@ idle drift on phones, and nothing at all when WebGL is missing or the visitor pr
 reduced motion — in which case the hero falls back to the same static SVG it always
 used. The page scrolls normally either way; nothing intercepts the wheel, and the
 canvas takes no pointer events.
+
+**The content is choreographed too.** `motion.js` runs one rAF loop over only
+the elements currently on screen and writes numbers into custom properties
+(`--enter`, `--p`, `--draw`, `--vel`); every transform is composed in `styles.css`.
+Headings uncover a word at a time, project rows rise and wipe open, toolbox and
+stat cards start gathered at one measured point and spread into their grid, and
+the journey draws its own spine. Entrances latch: once an element arrives it gets
+`.is-in`, which is also what turns its transition back on so hover states animate
+without smearing the entrance.
 
 **It costs three draw calls.** Nodes are one `InstancedMesh`, edges one `LineSegments`,
 dust one `Points`. Instance buffers are only rewritten when the morph actually advances,

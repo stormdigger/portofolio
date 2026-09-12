@@ -3,6 +3,7 @@ import {
   marquee, profile, projects, toolbox,
 } from './data.js';
 import { renderDiagram, heroFallback } from './diagrams.js';
+import { startMotion } from './motion.js';
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -39,9 +40,12 @@ const icon = (name, size = 17) => `
    ========================================================================== */
 
 function renderHero() {
-  // The tagline's final clause gets the animated gradient.
+  // Two masked lines. The tagline's final clause keeps the animated gradient,
+  // and because the gradient sits on the same element that moves, the
+  // background-clip stays intact through the reveal.
   $('#hero-title').innerHTML = `
-    I build backend systems<br><span class="grad">people depend on.</span>
+    <span class="line"><span class="line-i" style="--i:0">I build backend systems</span></span>
+    <span class="line"><span class="line-i grad" style="--i:1">people depend on.</span></span>
   `;
   $('#hero-lead').textContent = profile.intro;
   $('#status-text').textContent = profile.available;
@@ -75,9 +79,9 @@ function renderWork() {
         <p class="project-question">${project.question}</p>
         <p class="project-desc">${project.summary}</p>
         <div class="project-tags">
-          ${project.tools.slice(0, 5).map((tool) => `<span class="tag">${tool}</span>`).join('')}
+          ${project.tools.slice(0, 5).map((tool, t) => `<span class="tag" style="--i:${t}">${tool}</span>`).join('')}
           ${project.tools.length > 5
-            ? `<span class="tag">+${project.tools.length - 5}</span>`
+            ? `<span class="tag" style="--i:5">+${project.tools.length - 5}</span>`
             : ''}
         </div>
         <div class="project-actions">
@@ -104,7 +108,7 @@ function renderJourney() {
         <h3>${chapter.title}</h3>
         <p>${chapter.text}</p>
         <div class="chapter-facts">
-          ${chapter.facts.map((fact) => `<span class="tag">${fact}</span>`).join('')}
+          ${chapter.facts.map((fact, f) => `<span class="tag" style="--i:${f}">${fact}</span>`).join('')}
         </div>
       </div>
     </div>
@@ -119,7 +123,7 @@ function renderToolbox() {
       <p class="tool-line">${tool.line}</p>
       <p>${tool.text}</p>
       <div class="tool-tags">
-        ${tool.tools.map((name) => `<span class="tag">${name}</span>`).join('')}
+        ${tool.tools.map((name, t) => `<span class="tag" style="--i:${t}">${name}</span>`).join('')}
       </div>
     </article>
   `).join('');
@@ -128,14 +132,14 @@ function renderToolbox() {
 function renderProof() {
   $('#stat-grid').innerHTML = achievements.map((item, i) => `
     <div class="stat reveal" style="--tone:${item.tone}; --delay:${i * 50}ms">
-      <p class="stat-value">${item.value}</p>
+      <p class="stat-value"><span>${item.value}</span></p>
       <h3>${item.title}</h3>
       <p>${item.detail}</p>
     </div>
   `).join('');
 
   $('#certs').innerHTML = certifications
-    .map((cert) => `<span class="tag">${cert}</span>`)
+    .map((cert, i) => `<span class="tag" style="--i:${i}">${cert}</span>`)
     .join('');
 }
 
@@ -294,24 +298,12 @@ if (sections.length) {
 }
 
 /* ==========================================================================
-   Scroll reveal
+   Content choreography
    ========================================================================== */
 
-const revealables = $$('.reveal');
-
-if (motion.matches) {
-  revealables.forEach((element) => element.classList.add('in'));
-} else {
-  const revealer = new IntersectionObserver((entries) => {
-    for (const entry of entries) {
-      if (!entry.isIntersecting) continue;
-      entry.target.classList.add('in');
-      revealer.unobserve(entry.target);
-    }
-  }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
-
-  revealables.forEach((element) => revealer.observe(element));
-}
+// Imported eagerly rather than dynamically: unlike the world, this decides how
+// the copy arrives, so it has to be in place before the first paint.
+startMotion();
 
 /* ==========================================================================
    The world — progressively enhanced, never required
