@@ -711,6 +711,49 @@ img, svg, canvas { max-width: 100%; display: block; }
   pointer-events: none;
 }
 
+/* --------------------------------------------------------------------------
+   Anchored copy — real HTML, positioned from the 3D scene
+
+   A block pinned to a point in the corridor gets one `transform` per frame from
+   anchor.js. It is still ordinary markup: selectable, searchable, reachable by
+   a screen reader, styled by this stylesheet. The scene only decides where it
+   goes. Without `.anchors-on` — narrow screens, no WebGL, reduced motion — none
+   of this applies and every block stays in normal document flow.
+   -------------------------------------------------------------------------- */
+
+.anchored {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 2;
+  width: var(--anchor-w, min(430px, 40vw));
+  max-width: calc(100vw - 48px);
+  /* Only the block the camera is beside takes clicks; see anchor.js. */
+  pointer-events: none;
+  /* The transform is rewritten every frame, so any transition would smear it. */
+  transition: none !important;
+  will-change: transform, opacity;
+}
+
+.anchored.anchor-live { pointer-events: auto; }
+
+#hop-dispatch { --anchor-w: min(560px, 46vw); }
+#hop-ok { --anchor-w: min(580px, 48vw); }
+
+/* An anchored block is centred on its point, so anything taller than the
+   viewport loses both ends. The contact card is the one block big enough to
+   hit this, so it tightens up while it is flying. */
+.anchors-on .contact-card { padding: clamp(26px, 2.8vw, 40px); }
+.anchors-on #hop-ok h2 { font-size: clamp(26px, 2.5vw, 34px); }
+.anchors-on #hop-ok .contact-links { gap: 10px 18px; }
+
+/* With the copy pinned into the corridor, the hero's stage is redundant and
+   each anchored section becomes the scroll distance its hop is travelled over. */
+.anchors-on .hero-stage { display: none; }
+.anchors-on .hero-grid { display: block; }
+.anchors-on .hero { min-height: 126vh; }
+.anchors-on #contact { min-height: 112vh; }
+
 /* Content rides above the canvas. The header already sits at z-index 100. */
 .world-on main,
 .world-on .site-footer {

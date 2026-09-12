@@ -2,12 +2,17 @@
 
 A light, warm, fast portfolio. Hero → selected work → journey → toolbox → proof → contact.
 
-The page is one continuous 3D shot. Scroll position drives a camera through eight beats,
-from a single node on a desk in a small room to a serverless system a hospital runs on.
-There are no cuts: the same ~1800 points are rearranged from beat to beat, so the node
-that opens the film is the node that ends it. Everything else is flat HTML, CSS, and
-inline SVG, and the whole world is a background layer — remove it and the site is the
-same flat, fast page it has always been.
+The page is one request. Scroll moves a camera down a corridor past eleven hops — from
+`GET /balwinder-singh` at the top, through every service in the career in the order it
+was built, to `200 OK` at the bottom. The route is not a metaphor borrowed from
+somewhere else: the hops are the real `flow` arrays already in `data.js`
+(`Patient → API Gateway → Lambda → PostgreSQL`).
+
+Copy at a hop is anchored *into* the corridor rather than laid over it — ordinary HTML,
+given one transform per frame computed from the same camera that draws the world. It is
+still selectable, searchable and reachable by a screen reader; the scene only decides
+where it goes. Remove the world and the site is the same flat, fast page it has always
+been.
 
 ## Run locally
 
@@ -39,7 +44,8 @@ npm test          # screenshots + overflow/console check at 5 viewports
 | `data.js` | Every fact on the site: profile, projects, chapters, toolbox, achievements |
 | `app.js` | Renders each section, wires the dialog, nav, scroll reveal, and hero mount |
 | `diagrams.js` | Animated inline-SVG architecture diagrams, one per project |
-| `beats.js` | The shot list: eight point arrangements, each with its camera |
+| `route.js` | The route: eleven hops, their formations, and where each one's copy pins |
+| `anchor.js` | Projects a 3D point to screen coordinates and drives one HTML block |
 | `motion.js` | Content choreography — entrances, parallax, spread, split headings |
 | `world.js` | The rig — fixed canvas, scroll driver, damped camera, render loop |
 | `styles.css` | The whole design system: tokens, layout, components, responsive rules |
@@ -68,10 +74,20 @@ the journey draws its own spine. Entrances latch: once an element arrives it get
 `.is-in`, which is also what turns its transition back on so hover states animate
 without smearing the entrance.
 
-**It costs three draw calls.** Nodes are one `InstancedMesh`, edges one `LineSegments`,
-dust one `Points`. Instance buffers are only rewritten when the morph actually advances,
-and the render loop stops once nothing is left to settle. `MEASUREMENT` sets its drift
-rate to zero, so a camera parked on that beat renders nothing at all.
+**Nothing moves but the camera.** A request travels, it does not morph, so the point
+budget is split between the hops and each group is parked at its own depth. Positions are
+written to the GPU once at load and never touched again: a frame is a camera update, an
+anchor pass, and two draw calls. The loop stops once nothing is left to settle.
+
+**Depth comes from fog.** On a light background there is no darkness to recede into and
+no glow to fall off. Fog set to the page's own `--paper` does it — distance dissolves
+into the background as if the paper were air — and it is tight on purpose, because it
+has to close before the next hop comes into view or a formation two hops ahead reads as
+clutter behind the copy you are reading.
+
+**Hops are tied to the document, not to a scroll percentage.** Each hop with a section of
+its own records the scroll offset where that section is centred, and hops in between are
+spread evenly across the gap. Sections can grow or shrink and the camera stays with them.
 
 **Diagrams over decoration.** Each project card shows the actual request path — the
 travelling pulse follows the same `flow` array printed in the case study. Motion is

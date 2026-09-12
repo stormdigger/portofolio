@@ -328,6 +328,13 @@ async function mountWorld() {
 
     world = new World($('#world'), { tier });
     document.body.classList.add('world-on');
+
+    // Push 1 wires the two ends of the route. The hops between them are
+    // travelled but not yet anchored, so their sections stay in normal flow.
+    world.bindAnchors({
+      dispatch: $('#hop-dispatch'),
+      ok: $('#hop-ok'),
+    });
   } catch (error) {
     console.warn('The world could not start; falling back to the flat site.', error);
     document.body.classList.add('no-webgl');
