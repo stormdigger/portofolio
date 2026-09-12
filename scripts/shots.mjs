@@ -21,7 +21,11 @@ const SECTIONS = ['top', 'work', 'journey', 'toolbox', 'proof', 'contact'];
 
 await mkdir(outDir, { recursive: true });
 
+// swiftshader gives the headless run a real WebGL context, so the world is
+// actually exercised rather than silently falling back to the flat site.
+// CHROMIUM_PATH lets a CI image point at a browser Playwright did not download.
 const browser = await chromium.launch({
+  executablePath: process.env.CHROMIUM_PATH || undefined,
   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'],
 });
 

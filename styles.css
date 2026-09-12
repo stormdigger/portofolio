@@ -498,13 +498,6 @@ img, svg, canvas { max-width: 100%; display: block; }
   box-shadow: var(--shadow-lg);
 }
 
-#hero-canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
 /* Static SVG shown when WebGL is unavailable or motion is reduced. */
 .hero-fallback {
   position: absolute;
@@ -515,7 +508,56 @@ img, svg, canvas { max-width: 100%; display: block; }
 }
 
 .no-webgl .hero-fallback { display: grid; }
-.no-webgl #hero-canvas { display: none; }
+
+/* ==========================================================================
+   The world — one fixed canvas behind the whole document
+
+   The page scrolls over it normally: no wheel handler, no scroll-jacking, and
+   no pointer events on the canvas itself. With `.world-on` absent, every rule
+   here is inert and the site is exactly the flat version it has always been.
+   ========================================================================== */
+
+#world {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* Content rides above the canvas. The header already sits at z-index 100. */
+.world-on main,
+.world-on .site-footer {
+  position: relative;
+  z-index: 1;
+}
+
+/* Let the world through where the page used to paint solid panels. */
+.world-on .hero::before { opacity: 0.5; }
+
+.world-on .hero-stage {
+  background: none;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.world-on .strip { background: #f7efe6cc; }
+
+/* These two sections used to paint a solid panel. Over a continuous shot a solid
+   edge reads as a seam — the world is vivid on one side of it and washed on the
+   other — so the veil fades in and out instead of starting hard. */
+.world-on .journey,
+.world-on .proof {
+  background: linear-gradient(
+    to bottom,
+    #f7efe600 0%,
+    #f7efe6de 9%,
+    #f7efe6de 91%,
+    #f7efe600 100%
+  );
+}
 
 .stage-badge {
   position: absolute;

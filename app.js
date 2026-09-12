@@ -314,39 +314,41 @@ if (motion.matches) {
 }
 
 /* ==========================================================================
-   Hero 3D — progressively enhanced, never required
+   The world — progressively enhanced, never required
    ========================================================================== */
 
-const canvas = $('#hero-canvas');
-let hero = null;
+let world = null;
 
-async function mountHero() {
-  // Reduced motion gets the static SVG; no reason to ship a renderer for it.
-  if (motion.matches) {
-    document.body.classList.add('no-webgl');
-    return;
-  }
-
+/**
+ * Every beat of the take is a background layer. Remove the canvas — no WebGL,
+ * reduced motion, an old phone — and the page is exactly the flat, fast site it
+ * was before: same content, same order, same fallback diagram in the hero card.
+ */
+async function mountWorld() {
   try {
-    const { HeroScene } = await import('./hero3d.js');
-    hero = new HeroScene(canvas, { reducedMotion: motion.matches });
+    const { World, pickTier } = await import('./world.js');
+    const tier = pickTier(motion.matches);
+
+    if (tier === 'off') {
+      document.body.classList.add('no-webgl');
+      return;
+    }
+
+    world = new World($('#world'), { tier });
+    document.body.classList.add('world-on');
   } catch (error) {
-    console.warn('Hero 3D unavailable; using the static diagram.', error);
+    console.warn('The world could not start; falling back to the flat site.', error);
     document.body.classList.add('no-webgl');
   }
 }
 
-mountHero();
+mountWorld();
 
-let resizeTimer;
-addEventListener('resize', () => {
-  clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => hero?.resize(), 140);
-});
-
+// Reduced motion can be switched on mid-visit; tear the world down when it is.
 motion.addEventListener('change', () => {
-  if (!motion.matches) return;
-  hero?.dispose();
-  hero = null;
+  if (!motion.matches || !world) return;
+  world.dispose();
+  world = null;
+  document.body.classList.remove('world-on');
   document.body.classList.add('no-webgl');
 });
