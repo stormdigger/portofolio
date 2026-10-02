@@ -1986,6 +1986,27 @@ dialog::backdrop {
    Responsive
    ========================================================================== */
 
+@media (max-width: 900px) {
+  /* On narrow screens the scene shares the text column. Keep it visible but
+     quiet, including while the camera moves between sections. */
+  #world { opacity: 0.28; }
+
+  /* Fixed fade lengths finish inside the section padding. Percentage fades
+     stretched behind headings when stacked mobile content made sections tall. */
+  .world-on .research,
+  .world-on .journey,
+  .world-on .toolbox,
+  .world-on .proof {
+    background: linear-gradient(
+      to bottom,
+      #f7efe600 0,
+      #f7efe6de 32px,
+      #f7efe6de calc(100% - 32px),
+      #f7efe600 100%
+    );
+  }
+}
+
 @media (max-width: 980px) {
   .hero-grid { grid-template-columns: 1fr; }
 

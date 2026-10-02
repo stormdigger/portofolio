@@ -41,3 +41,22 @@
 [1002/205207.523:ERROR:gpu\command_buffer\service\gl_utils.cc:427] [.WebGL-0x59cc001c7200]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
 [1002/205208.288:ERROR:gpu\command_buffer\service\gl_utils.cc:427] [.WebGL-0x59cc001c7200]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
 [1002/205208.556:ERROR:gpu\command_buffer\service\gl_utils.cc:427] [.WebGL-0x59cc001c7200]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)
+[1002/212045.983:ERROR:ui\gl\init\gl_factory.cc:110] Requested GL implementation (gl=none,angle=none) not found in allowed implementations: [(gl=egl-angle,angle=default)].
+[1002/212045.995:ERROR:components\viz\service\main\viz_main_impl.cc:190] Exiting GPU process due to errors during initialization
+[1002/212046.352:ERROR:ui\gl\init\gl_factory.cc:110] Requested GL implementation (gl=none,angle=none) not found in allowed implementations: [(gl=egl-angle,angle=default)].
+[1002/212046.357:ERROR:components\viz\service\main\viz_main_impl.cc:190] Exiting GPU process due to errors during initialization
+[1002/212047.273:ERROR:cc\raster\one_copy_raster_buffer_provider.cc:286] Creation of StagingBuffer's SharedImage failed.
+[1002/212047.273:ERROR:cc\raster\one_copy_raster_buffer_provider.cc:286] Creation of StagingBuffer's SharedImage failed.
+[1002/212048.453:ERROR:gpu\command_buffer\service\gl_utils.cc:427] [.WebGL-0xda400b66400]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+[1002/212048.714:ERROR:gpu\command_buffer\service\gl_utils.cc:427] [.WebGL-0xda400b66400]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+[1002/212048.848:ERROR:gpu\command_buffer\service\gl_utils.cc:427] [.WebGL-0xda400b66400]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+[1002/212048.988:ERROR:gpu\command_buffer\service\gl_utils.cc:427] [.WebGL-0xda400b66400]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)
+[1002/212205.980:ERROR:ui\gl\init\gl_factory.cc:110] Requested GL implementation (gl=none,angle=none) not found in allowed implementations: [(gl=egl-angle,angle=default)].
+[1002/212205.987:ERROR:components\viz\service\main\viz_main_impl.cc:190] Exiting GPU process due to errors during initialization
+[1002/212206.241:ERROR:ui\gl\init\gl_factory.cc:110] Requested GL implementation (gl=none,angle=none) not found in allowed implementations: [(gl=egl-angle,angle=default)].
+[1002/212206.243:ERROR:components\viz\service\main\viz_main_impl.cc:190] Exiting GPU process due to errors during initialization
+[1002/212206.417:ERROR:gpu\ipc\client\command_buffer_proxy_impl.cc:285] ContextResult::kTransientFailure: Failed to send GpuControl.CreateCommandBuffer.
+[1002/212206.580:ERROR:gpu\command_buffer\service\gl_utils.cc:427] [.WebGL-0x12c00c10000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+[1002/212207.807:ERROR:gpu\command_buffer\service\gl_utils.cc:427] [.WebGL-0x12c00c10000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+[1002/212207.878:ERROR:gpu\command_buffer\service\gl_utils.cc:427] [.WebGL-0x12c00c10000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+[1002/212207.924:ERROR:gpu\command_buffer\service\gl_utils.cc:427] [.WebGL-0x12c00c10000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)
