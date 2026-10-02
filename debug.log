@@ -60,3 +60,12 @@
 [1002/212207.807:ERROR:gpu\command_buffer\service\gl_utils.cc:427] [.WebGL-0x12c00c10000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
 [1002/212207.878:ERROR:gpu\command_buffer\service\gl_utils.cc:427] [.WebGL-0x12c00c10000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
 [1002/212207.924:ERROR:gpu\command_buffer\service\gl_utils.cc:427] [.WebGL-0x12c00c10000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)
+[1002/213057.240:ERROR:ui\gl\init\gl_factory.cc:110] Requested GL implementation (gl=none,angle=none) not found in allowed implementations: [(gl=egl-angle,angle=default)].
+[1002/213057.260:ERROR:components\viz\service\main\viz_main_impl.cc:190] Exiting GPU process due to errors during initialization
+[1002/213058.405:ERROR:ui\gl\init\gl_factory.cc:110] Requested GL implementation (gl=none,angle=none) not found in allowed implementations: [(gl=egl-angle,angle=default)].
+[1002/213058.406:ERROR:components\viz\service\main\viz_main_impl.cc:190] Exiting GPU process due to errors during initialization
+[1002/213058.919:ERROR:cc\raster\one_copy_raster_buffer_provider.cc:286] Creation of StagingBuffer's SharedImage failed.
+[1002/213059.967:ERROR:gpu\command_buffer\service\gl_utils.cc:427] [.WebGL-0x463400b32a00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+[1002/213100.092:ERROR:gpu\command_buffer\service\gl_utils.cc:427] [.WebGL-0x463400b32a00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+[1002/213100.327:ERROR:gpu\command_buffer\service\gl_utils.cc:427] [.WebGL-0x463400b32a00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels
+[1002/213100.524:ERROR:gpu\command_buffer\service\gl_utils.cc:427] [.WebGL-0x463400b32a00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)

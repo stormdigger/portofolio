@@ -1987,9 +1987,12 @@ dialog::backdrop {
    ========================================================================== */
 
 @media (max-width: 900px) {
-  /* On narrow screens the scene shares the text column. Keep it visible but
-     quiet, including while the camera moves between sections. */
-  #world { opacity: 0.28; }
+  /* Keep the mobile scene inside the hero visual. The boundary follows the
+     actual copy position as the page scrolls, so no particles reach the text. */
+  #world {
+    -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 var(--world-fade-start, 0px), transparent var(--world-fade-end, 0px));
+    mask-image: linear-gradient(to bottom, #000 0, #000 var(--world-fade-start, 0px), transparent var(--world-fade-end, 0px));
+  }
 
   /* Fixed fade lengths finish inside the section padding. Percentage fades
      stretched behind headings when stacked mobile content made sections tall. */

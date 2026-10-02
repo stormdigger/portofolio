@@ -188,7 +188,7 @@ export class World {
     this.onScroll = () => { this.readScroll(); this.wake(); };
     addEventListener('scroll', this.onScroll, { passive: true });
 
-    this.onResize = () => { this.resize(); this.wake(); };
+    this.onResize = () => { this.resize(); this.readScroll(); this.wake(); };
     addEventListener('resize', this.onResize, { passive: true });
 
     this.onPointer = (event) => {
@@ -208,6 +208,17 @@ export class World {
   readScroll() {
     const max = document.documentElement.scrollHeight - innerHeight;
     this.target = max > 4 ? clamp(scrollY / max, 0, 1) : 0;
+
+    // Full strength in the opening visual, then a gradual fade ending before
+    // the mobile copy. Use layout coordinates so reveal transforms cannot
+    // temporarily push the mask into the text below.
+    if (innerWidth <= 900) {
+      const stage = document.querySelector('.hero-stage');
+      const end = Math.max(0, stage.getBoundingClientRect().bottom - 16);
+      const start = Math.max(0, end - 180);
+      this.canvas.style.setProperty('--world-fade-start', `${start}px`);
+      this.canvas.style.setProperty('--world-fade-end', `${end}px`);
+    }
   }
 
   resize() {
