@@ -19,6 +19,7 @@
   }
 
   * { box-sizing: border-box; }
+  a { color: inherit; overflow-wrap: anywhere; text-underline-offset: 3px; }
 
   body {
     margin: 0;
@@ -203,42 +204,47 @@
     <h2>Projects</h2>
 
     <div>
-      <h3>AgriStore — Full-stack commerce platform</h3>
-      <p class="meta">2025 · Spring Boot · Thymeleaf · MySQL · AWS</p>
-      <p>E-commerce platform designed around farmers, with role-based authentication, product
-         management, and automated PDF invoices. Deployed on AWS using Elastic Beanstalk, EC2,
-         S3, and RDS, with SQL query tuning as the dataset grew.</p>
+      <h3>HumanAtlas 3D — Interactive anatomy atlas · humanatlas3d.vercel.app</h3>
+      <p class="meta">2026 · Next.js · React Three Fiber · Three.js · WebGL</p>
+      <p>Free browser-based 3D anatomy atlas: 2,882 scan-derived meshes across 11 body systems,
+         male and female reference bodies, layer-by-layer dissection, plane slicing, clickable
+         structures with clinical notes, guided tours, and a spaced-repetition quiz.</p>
     </div>
 
     <div>
-      <h3>DoctorG — Multimodal AI assistant</h3>
-      <p class="meta">2024 · Flask · Groq · Llama 3 Vision · Whisper · ElevenLabs</p>
-      <p>Combines voice conversation, image analysis, and spoken responses. Whisper transcribes
-         speech, Llama 3 Vision analyses images through Groq, and ElevenLabs returns the reply
-         as audio — connected by Flask into a low-latency loop.</p>
+      <h3>AgriStore — Farm price comparison engine · agristore.onrender.com</h3>
+      <p class="meta">2025 — 2026 · Spring Boot · Spring Security · Thymeleaf · SQL · AWS</p>
+      <p>Compares 26,723 seller prices for 12,179 farm products across 16 Indian sellers and 464
+         brands. Polite feed ingestion with SHA-256 evidence, brand/model matching that never
+         mixes active ingredients, and per-pack price normalisation. Began as a farmer
+         storefront deployed on AWS (Elastic Beanstalk, EC2, S3, RDS).</p>
     </div>
 
     <div>
-      <h3>FaceMeet — Authenticated video conferencing</h3>
-      <p class="meta">2023 · Python · Flask · MySQL · dlib · VideoSDK</p>
-      <p>Video conferencing with facial-recognition authentication. The backend verifies the
-         participant, establishes a secure session, and connects the call through VideoSDK.</p>
+      <h3>Health 9000 — AI doctor · health9000.vercel.app</h3>
+      <p class="meta">2024 — 2026 · Next.js · Flask · Groq · Llama 3 Vision · Whisper · ElevenLabs</p>
+      <p>AI health companion with consultations, vitals tracking, and smart reminders. Grew out
+         of DoctorG: Whisper transcribes speech, Llama 3 Vision analyses images through Groq,
+         and ElevenLabs speaks the reply — connected into one low-latency loop.</p>
     </div>
+
   </section>
 
   <section>
     <h2>Research</h2>
     <div>
-      <h3>Comparative Study of YOLOv8, Faster R-CNN &amp; SSD in Traffic Sign Detection</h3>
-      <p class="meta">IEEE · 2025</p>
-      <p>Benchmarks detection approaches for GPS feedback, monitoring systems, and
-         autonomous-driving deployment.</p>
+      <h3><a href="https://ieeexplore.ieee.org/document/11059135">A Comparative Study of YOLOv8, Faster R-CNN, and SSD in Traffic Sign Detection with Consideration of GPS and Central Feedback</a></h3>
+      <p class="meta">ICACCM 2024 · IEEE · pp. 1–7</p>
+      <p>Sonu, <strong>Balwinder Singh</strong>, Ajay, and Ankita Sharma.</p>
+      <p>Compares traffic-sign detection approaches with GPS and central feedback.</p>
+      <p>DOI: <a href="https://doi.org/10.1109/ICACCM61117.2024.11059135">10.1109/ICACCM61117.2024.11059135</a></p>
     </div>
     <div>
-      <h3>Login Confirmation Mechanism for Meeting Platforms</h3>
-      <p class="meta">IEEE · 2024</p>
-      <p>Examines facial recognition for participant authentication: accuracy, latency, and
-         robustness in real-world conditions.</p>
+      <h3><a href="https://ieeexplore.ieee.org/document/10596633">A Login Confirmation Mechanism for Meeting Platforms with an Automatic Face Acknowledgment System</a></h3>
+      <p class="meta">CCICT 2024 · IEEE · pp. 609–616</p>
+      <p>Sanjay Singla, Neha Rajput, Sonu, <strong>Balwinder Singh</strong>, Arpan Ghosh, and Ajay Kumar.</p>
+      <p>Proposes participant authentication using Haar-cascade face detection and LBPH recognition.</p>
+      <p>DOI: <a href="https://doi.org/10.1109/CCICT62777.2024.00100">10.1109/CCICT62777.2024.00100</a></p>
     </div>
   </section>
 

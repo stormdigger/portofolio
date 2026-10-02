@@ -44,135 +44,122 @@ export const contactHref = (() => {
 export const heroMeta = [
   { label: 'Now', value: 'SDE · Arovita Care' },
   { label: 'Focus', value: 'Backend · AWS · APIs' },
-  { label: 'Published', value: '2 IEEE papers' },
+  { label: 'Published', value: '2 IEEE papers', href: '#research' },
   { label: 'Based in', value: profile.location },
 ];
 
 /** Scrolling capability strip under the hero. */
 export const marquee = [
   'AWS Lambda', 'API Gateway', 'PostgreSQL', 'Spring Boot', 'Java', 'Python',
-  'React', 'Flask', 'Cognito', 'Docker', 'MySQL', 'OpenCV', 'YOLOv8', 'REST APIs',
+  'React', 'Next.js', 'Three.js', 'Flask', 'Cognito', 'Docker', 'MySQL', 'OpenCV', 'YOLOv8', 'REST APIs',
 ];
-
 /**
- * Projects, newest first — a recruiter should hit production work immediately.
- * `diagram` selects the animated SVG rendered in the card.
+ * Projects, strongest first — the three live products lead, so a recruiter can
+ * click straight into working software. `live` adds the browser-frame
+ * screenshot and the "Visit live site" button; `stats` are read off the live
+ * deployment. Projects without `live` keep their animated architecture diagram.
  */
 export const projects = [
   {
-    id: 'arovita',
-    title: 'Arovita HMS',
-    year: '2025 — Present',
-    role: 'Software Development Engineer · Arovita Care',
-    tone: 'sky',
-    diagram: 'serverless',
-    question: 'What changes when someone depends on what you build?',
+    id: 'humanatlas',
+    title: 'HumanAtlas 3D',
+    year: '2026',
+    role: 'Interactive 3D · Solo project',
+    tone: 'teal',
+    diagram: 'multimodal',
+    live: { url: 'https://humanatlas3d.vercel.app/', host: 'humanatlas3d.vercel.app' },
+    shots: ['assets/projects/humanatlas.jpg'],
+    question: 'Can a browser tab hold the whole human body?',
     summary:
-      'Core modules of a multi-tenant Hospital Management System — built with a team of '
-      + 'backend engineers, designers, and QA.',
+      'A free, interactive 3D anatomy atlas. 2,882 scan-derived meshes across 11 body '
+      + 'systems — rotate, dissect layer by layer, slice on anatomical planes, and click any '
+      + 'structure to learn what it does.',
+    stats: [
+      { value: '2,882', label: '3D meshes' },
+      { value: '11', label: 'body systems' },
+      { value: '2', label: 'reference bodies' },
+    ],
     system:
-      'Core modules of a multi-tenant Hospital Management System at Arovita Care, built as '
-      + 'part of a team of backend engineers, designers, and QA.',
+      'A browser-based anatomy atlas built on scan-derived reference anatomy, with male and '
+      + 'female models, guided tours, a quiz, a compare mode and a disease explorer.',
     engineering:
-      'AWS API Gateway routes requests to Lambda functions backed by PostgreSQL. Cognito, JWT, '
-      + 'and MFA support authentication. Role-based dashboards serve doctors, nurses, '
-      + 'receptionists, and patients across OPD/IPD, appointments, EMR, prescriptions, and '
-      + 'billing. Agora SDK enables real-time video and audio for telemedicine. Work also '
-      + 'includes camera-based heart-rate monitoring, API integration, API design, and UX '
-      + 'collaboration across the SDLC.',
-    tools: ['AWS Lambda', 'API Gateway', 'PostgreSQL', 'Cognito', 'JWT', 'MFA', 'Agora SDK'],
-    flow: ['Patient', 'API Gateway', 'Lambda', 'PostgreSQL'],
-    note: 'The first system I worked on where being wrong had a real cost.',
+      'Next.js and React Three Fiber render the scene in WebGL. The male and female reference '
+      + 'bodies are assembled from Z-Anatomy and BodyParts3D models (CC BY-SA) — 2,882 '
+      + 'individually selectable meshes. Eleven body systems toggle independently; Dissect '
+      + 'peels the body layer by layer and slices it on anatomical planes; every structure '
+      + 'opens its anatomy, function and clinical notes. Guided tours, a spaced-repetition '
+      + 'quiz, side-by-side compare and Ctrl+K search all sit on the same scene graph, so '
+      + 'heavy geometry stays interactive on an ordinary laptop.',
+    tools: ['Next.js', 'React Three Fiber', 'Three.js', 'WebGL', 'Radix UI', 'Framer Motion'],
+    flow: ['Mesh library', 'Scene graph', 'Systems + layers', 'Click → notes'],
+    note: 'Rendering 2,882 meshes was the easy part. Keeping them responsive to a click was the work.',
   },
   {
     id: 'agristore',
     title: 'AgriStore',
-    year: '2025',
-    role: 'Full-stack · Solo project',
+    year: '2025 — 2026',
+    role: 'Full-stack · Data · Solo project',
     tone: 'leaf',
     diagram: 'commerce',
-    question: 'How do you take something built locally into the real world?',
+    live: { url: 'https://agristore.onrender.com/', host: 'agristore.onrender.com' },
+    shots: ['assets/projects/agristore.jpg', 'assets/projects/agristore-2.jpg'],
+    question: 'What does a farmer actually pay for the same pack?',
     summary:
-      'A full-stack commerce platform for farmers, with role-based auth, product management, '
-      + 'and automated PDF invoices — deployed to AWS.',
+      'A price-comparison engine for Indian farm inputs. Seeds, fertilisers, crop protection '
+      + 'and machinery from 16 online sellers, matched by brand, product and pack size.',
+    stats: [
+      { value: '12,179', label: 'products' },
+      { value: '26,723', label: 'seller prices' },
+      { value: '16', label: 'sellers tracked' },
+      { value: '464', label: 'brands' },
+    ],
     system:
-      'A full-stack e-commerce platform designed around farmers, with role-based '
-      + 'authentication, product management, and automated PDF invoices.',
+      'An independent price-comparison site for seeds, fertilisers, crop protection, manure, '
+      + 'machinery and tools sold online in India. It links to sellers; it never sells.',
     engineering:
-      'Spring Boot handles application workflows, Thymeleaf renders the interface, and MySQL '
-      + 'stores commerce data. The platform was deployed on AWS using Elastic Beanstalk, EC2, '
-      + 'S3, and RDS. SQL query tuning supports the application as its data grows.',
-    tools: ['Spring Boot', 'Thymeleaf', 'MySQL', 'Elastic Beanstalk', 'EC2', 'S3', 'RDS'],
-    flow: ['User + role', 'Products', 'Order', 'MySQL', 'PDF invoice'],
-    note: 'Building the application was one problem. Deploying it was another.',
+      'A Spring Boot application with Thymeleaf views and Spring Security. An ingestion '
+      + 'pipeline reads the public product feeds of 16 sellers politely — robots.txt '
+      + 'respected — and keeps every fetch time and SHA-256 fingerprint as evidence. Listings '
+      + 'are grouped only when brand and normalised product name match (or, for equipment, the '
+      + 'manufacturer model code), and never across different active ingredients. Prices are '
+      + 'bucketed by pack size and normalised to per-litre, per-kg or per-1,000-seeds so '
+      + 'different packs compare fairly; anything older than seven days is labelled '
+      + 'historical, and rankings are never paid. It began as a farmer storefront deployed on '
+      + 'AWS (Elastic Beanstalk, EC2, S3, RDS) and was rebuilt into this engine.',
+    tools: ['Spring Boot', 'Spring Security', 'Thymeleaf', 'SQL', 'Data pipelines', 'AWS', 'Render'],
+    flow: ['16 seller feeds', 'Ingest + fingerprint', 'Match + normalise', 'Price per pack'],
+    note: 'Building a store taught me commerce. Turning it into a comparison engine taught me data.',
   },
   {
-    id: 'doctorg',
-    title: 'DoctorG',
-    year: '2024',
-    role: 'Multimodal AI · Solo project',
+    id: 'health9000',
+    title: 'Health 9000',
+    year: '2024 — 2026',
+    role: 'AI doctor · Solo project',
     tone: 'violet',
     diagram: 'multimodal',
-    question: 'What happens when software can see, hear and respond?',
+    live: { url: 'https://health9000.vercel.app/landing', host: 'health9000.vercel.app' },
+    shots: ['assets/projects/health9000.jpg', 'assets/projects/health9000-2.jpg'],
+    question: 'What if the first consultation could happen any hour of the day?',
     summary:
-      'A multimodal AI assistant that listens, looks at an image, reasons, and answers out '
-      + 'loud — wired into one low-latency loop.',
+      'An AI health companion: symptom analysis, instant consultations, vitals tracking and '
+      + 'medication reminders — grown out of DoctorG, my voice-and-vision medical assistant.',
+    stats: [
+      { value: '24/7', label: 'availability' },
+      { value: '3', label: 'input modes' },
+      { value: '3', label: 'AI models chained' },
+    ],
     system:
-      'A multimodal AI medical-assistant project that combines voice conversations, image '
-      + 'analysis, and conversational responses.',
+      'A personal health platform with AI consultations, health tracking with charts, and '
+      + 'smart reminders for medication and appointments.',
     engineering:
-      'Whisper transcribes speech. Llama 3 Vision analyzes image input through Groq, and the '
-      + 'application generates a conversational response. ElevenLabs returns the response as '
-      + 'speech. Flask connects these stages into a low-latency interaction loop.',
-    tools: ['Flask', 'Groq API', 'Llama 3 Vision', 'Whisper', 'ElevenLabs'],
-    flow: ['Voice', 'Whisper', 'Vision + reasoning', 'ElevenLabs'],
-    note: 'A project in multimodal interaction, not a clinical service.',
-  },
-  {
-    id: 'research',
-    title: 'IEEE Research',
-    year: '2024 / 2025',
-    role: 'Two published papers',
-    tone: 'amber',
-    diagram: 'benchmark',
-    question: 'Which approach works better, and why?',
-    summary:
-      'Two IEEE publications benchmarking traffic-sign detection models, and participant '
-      + 'authentication for meeting platforms.',
-    system:
-      'Two IEEE research publications investigating traffic-sign detection and participant '
-      + 'authentication in meeting platforms.',
-    engineering:
-      'Comparative Study of YOLOv8, Faster R-CNN & SSD in Traffic Sign Detection (2025) '
-      + 'benchmarks detection approaches in the context of GPS feedback, monitoring systems, '
-      + 'and autonomous-driving deployment. Login Confirmation Mechanism for Meeting Platforms '
-      + '(2024) examines facial recognition, authentication, accuracy, latency, and robustness '
-      + 'in real-world conditions.',
-    tools: ['YOLOv8', 'Faster R-CNN', 'SSD', 'Computer vision', 'Facial recognition'],
-    flow: ['Question', 'Models', 'Conditions', 'Comparison'],
-    note: 'Building taught me what was possible. Research taught me to measure what was better.',
-  },
-  {
-    id: 'facemeet',
-    title: 'FaceMeet',
-    year: '2023',
-    role: 'Backend · Computer vision',
-    tone: 'coral',
-    diagram: 'auth',
-    question: 'What if a meeting could verify that you were actually you?',
-    summary:
-      'Video conferencing with facial-recognition authentication at the door — identity '
-      + 'first, then the call.',
-    system:
-      'A video conferencing platform with facial-recognition authentication and secure, '
-      + 'real-time communication.',
-    engineering:
-      'A camera frame enters the facial-recognition workflow. The backend authenticates the '
-      + 'participant, establishes a secure session, and connects them through VideoSDK. '
-      + 'Backend workflow improvements support the journey from identity to a live call.',
-    tools: ['Python', 'Flask', 'MySQL', 'Bootstrap', 'dlib', 'VideoSDK'],
-    flow: ['Face', 'Detection', 'Auth', 'Video session'],
-    note: 'An exploration of trust at the entrance to a meeting.',
+      'The product is a Next.js app: landing, accounts, consultations, tracking dashboards '
+      + 'and reminders. Its reasoning core began as DoctorG — Whisper transcribes speech, '
+      + 'Llama 3 Vision on Groq reads an image, the model answers conversationally, and '
+      + 'ElevenLabs speaks the reply. Flask wired those stages into one low-latency loop; '
+      + 'Health 9000 turns that loop into something a person can come back to every day.',
+    tools: ['Next.js', 'React', 'Flask', 'Groq API', 'Llama 3 Vision', 'Whisper', 'ElevenLabs'],
+    flow: ['Voice / image / text', 'Whisper + Vision', 'Reasoning', 'Answer + reminders'],
+    note: 'For guidance and learning — not a clinical service or a substitute for a doctor.',
   },
 ];
 
@@ -201,9 +188,9 @@ export const chapters = [
     tone: 'var(--leaf)',
     title: 'Software that could see and listen',
     text:
-      'FaceMeet put identity at the door of a video call. DoctorG chained speech, vision, and '
+      'A face-recognition gate for video calls became my first IEEE paper. DoctorG chained speech, vision, and '
       + 'a language model into one loop. Both taught me how much of the work is the wiring.',
-    facts: ['FaceMeet', 'DoctorG', 'Python · Flask'],
+    facts: ['Face-auth meetings', 'DoctorG', 'Python · Flask'],
   },
   {
     era: '2024 — 2025 · IEEE',
@@ -212,16 +199,17 @@ export const chapters = [
     text:
       'Building something was not enough. I wanted to know which approach was better, under '
       + 'what conditions, and by how much. Two papers came out of asking that properly.',
-    facts: ['2 IEEE papers', 'YOLOv8 · Faster R-CNN · SSD'],
+    facts: ['CCICT 2024', 'ICACCM 2024', 'YOLOv8 · Faster R-CNN · SSD'],
   },
   {
-    era: '2025 · Into production',
+    era: '2025 — 2026 · Into production',
     tone: 'var(--violet)',
-    title: 'From my machine to the cloud',
+    title: 'From my machine to the open internet',
     text:
-      'AgriStore worked locally long before it worked on AWS. Elastic Beanstalk, EC2, S3, RDS '
-      + '— deployment turned out to be its own engineering problem, not a final step.',
-    facts: ['AgriStore', 'AWS', 'Spring Boot'],
+      'AgriStore worked locally long before it worked on AWS — deployment turned out to be its '
+      + 'own engineering problem. Then it became a price engine over 26,000 seller prices, '
+      + 'HumanAtlas put 2,882 meshes in a browser tab, and DoctorG grew into Health 9000.',
+    facts: ['AgriStore', 'HumanAtlas 3D', 'Health 9000', 'AWS · Vercel'],
   },
   {
     era: 'Nov 2025 — Present · Arovita Care',
@@ -230,7 +218,7 @@ export const chapters = [
     text:
       'Doctors, nurses, and patients use what our team ships. Multi-tenant, serverless, '
       + 'role-based, audited. The code stopped being an experiment.',
-    facts: ['Arovita HMS', 'AWS Lambda', 'PostgreSQL', 'Telemedicine'],
+    facts: ['Hospital platform', 'AWS Lambda', 'PostgreSQL', 'Telemedicine'],
   },
 ];
 
@@ -266,7 +254,7 @@ export const toolbox = [
     icon: 'layout',
     line: 'For the person using it.',
     text: 'Good engineering still has to make sense to the person touching it.',
-    tools: ['React.js', 'Flutter', 'HTML5', 'CSS3', 'Bootstrap'],
+    tools: ['React.js', 'Next.js', 'Three.js', 'Flutter', 'HTML5', 'CSS3'],
   },
   {
     title: 'AI & vision',
@@ -306,15 +294,89 @@ export const education = {
   detail: 'CGPA 8.0 / 10 · Best Project of the Semester, Final Year CS Project',
 };
 
+/**
+ * Published papers. Every field below was checked against Crossref, IEEE Xplore
+ * and Semantic Scholar — titles, venues, pages, DOIs and author order are as
+ * published. `me` marks the author entry to highlight.
+ */
 export const research = [
   {
-    title: 'Comparative Study of YOLOv8, Faster R-CNN & SSD in Traffic Sign Detection',
-    meta: 'IEEE · 2025',
-    detail: 'Object detection benchmarked for GPS feedback, monitoring, and autonomous driving.',
+    id: 'traffic-signs',
+    tone: 'amber',
+    diagram: 'benchmark',
+    kind: 'IEEE conference paper',
+    title:
+      'A Comparative Study of YOLOv8, Faster R-CNN, and SSD in Traffic Sign Detection '
+      + 'with Consideration of GPS and Central Feedback',
+    venue: 'ICACCM 2024',
+    venueFull: '2024 International Conference on Advances in Computing, Communication and Materials',
+    place: 'Dehradun, India',
+    presented: 'Nov 2024',
+    published: 'IEEE Xplore · Jul 2025',
+    pages: '1–7',
+    doi: '10.1109/ICACCM61117.2024.11059135',
+    authors: ['Sonu', { name: 'Balwinder Singh', me: true }, 'Ajay', 'Ankita Sharma'],
+    question: 'Which detector should a car trust — and what can GPS add?',
+    abstract:
+      'Benchmarks three detector families for live traffic-sign recognition and proposes an '
+      + 'architecture that feeds GPS, telemetry and central feedback into detection, so the '
+      + 'system stays reliable across weather and traffic conditions.',
+    points: [
+      'YOLOv8, Faster R-CNN and SSD compared on real-time video',
+      'GPS and telemetry used as context for detection, not just extra layers',
+      'HOG and CNN features combined for classification',
+    ],
+    keywords: ['YOLOv8', 'Faster R-CNN', 'SSD', 'CNN', 'HOG', 'GPS'],
+    links: {
+      ieee: 'https://ieeexplore.ieee.org/document/11059135',
+      researchgate: 'https://www.researchgate.net/publication/393341117_A_Comparative_Study_of_YOLOv8_Faster_R-CNN_and_SSD_in_Traffic_Sign_Detection_with_Consideration_of_GPS_and_Central_Feedback',
+      scholar: 'https://www.semanticscholar.org/paper/423c4c31ade3284fd231a7d85f037870528441a1',
+    },
+    cite:
+      'Sonu, B. Singh, Ajay, and A. Sharma, "A Comparative Study of YOLOv8, Faster R-CNN, and '
+      + 'SSD in Traffic Sign Detection with Consideration of GPS and Central Feedback," in Proc. '
+      + '2024 Int. Conf. Advances in Computing, Communication and Materials (ICACCM), Dehradun, '
+      + 'India, 2024, pp. 1–7, doi: 10.1109/ICACCM61117.2024.11059135.',
   },
   {
-    title: 'Login Confirmation Mechanism for Meeting Platforms',
-    meta: 'IEEE · 2024',
-    detail: 'Participant authentication: accuracy, latency, and robustness in real conditions.',
+    id: 'face-login',
+    tone: 'coral',
+    diagram: 'auth',
+    kind: 'IEEE conference paper',
+    title:
+      'A Login Confirmation Mechanism for Meeting Platforms with an Automatic Face '
+      + 'Acknowledgment System',
+    venue: 'CCICT 2024',
+    venueFull:
+      '2024 Sixth International Conference on Computational Intelligence and Communication '
+      + 'Technologies',
+    place: 'Sonepat, India',
+    presented: 'Apr 2024',
+    published: 'IEEE Xplore · 2024',
+    pages: '609–616',
+    doi: '10.1109/CCICT62777.2024.00100',
+    authors: [
+      'Sanjay Singla', 'Neha Rajput', 'Sonu', { name: 'Balwinder Singh', me: true },
+      'Arpan Ghosh', 'Ajay Kumar',
+    ],
+    question: 'What stops someone with the link from walking into your meeting?',
+    abstract:
+      'A meeting link can be forwarded and a password can be shared. This paper puts face '
+      + 'recognition at the door of an online meeting, so only the invited attendees get in.',
+    points: [
+      'Four stages: participant entry, face detection, recognition, database',
+      'Haar-cascade detection with Local Binary Pattern Histogram recognition',
+      'Closes the gap where anyone holding the URL can join',
+    ],
+    keywords: ['Face recognition', 'Haar cascade', 'LBPH', 'Authentication', 'Video conferencing'],
+    links: {
+      ieee: 'https://ieeexplore.ieee.org/document/10596633',
+      scholar: 'https://www.semanticscholar.org/paper/e317818cb1982a76283be5cacdb785a6d15ba809',
+    },
+    cite:
+      'S. Singla, N. Rajput, Sonu, B. Singh, A. Ghosh, and A. Kumar, "A Login Confirmation '
+      + 'Mechanism for Meeting Platforms with an Automatic Face Acknowledgment System," in '
+      + 'Proc. 2024 6th Int. Conf. Computational Intelligence and Communication Technologies '
+      + '(CCICT), Sonepat, India, 2024, pp. 609–616, doi: 10.1109/CCICT62777.2024.00100.',
   },
 ];

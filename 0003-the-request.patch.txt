@@ -1,0 +1,1587 @@
+From 5f7e3ccdbb450e8c3bca23ad72d127c730116152 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 12 Sep 2026 10:26:19 +0000
+Subject: [PATCH] Turn the page into one request travelling a corridor
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The world and the copy were two layers that never touched: WebGL behind, cards
+in front, each doing its own thing. This is the structural fix — the page
+becomes a single request routed through every system in the career, and the copy
+moves into the corridor instead of floating over it.
+
+The concept is not borrowed from anywhere. The hops are the `flow` arrays that
+have been sitting in data.js since the first version, so the site's form is the
+thing it is describing rather than a metaphor fitted over a CV.
+
+New pieces:
+
+- route.js — eleven hops, each with a formation, a tone, a share of the point
+  budget, and the side its copy pins to. Formations are generated, not authored.
+- anchor.js — projects a world point through the same camera that draws the
+  scene and gives one HTML block a transform per frame. The copy stays ordinary
+  markup: selectable, searchable, reachable by a screen reader.
+- world.js — reworked from a camera orbiting a subject to a camera travelling a
+  corridor.
+
+Push 1 wires the two ends of the route, DISPATCH and 200 OK, so the anchoring
+can be judged before the other nine hops commit to it. The sections between keep
+their normal flow and are simply flown past.
+
+Notes on the implementation:
+
+- Nothing morphs any more. A request travels, so the point budget is split
+  between hops and parked at depth; positions go to the GPU once at load and are
+  never rewritten. A frame is a camera update, an anchor pass, and two draws.
+- Depth on a light background comes from fog set to the page's own paper colour.
+  It is tight deliberately: it has to close before the next hop appears, or a
+  formation two hops ahead reads as clutter behind the copy being read.
+- Hops bind to document sections rather than to a scroll percentage, so the
+  camera cannot drift away from the copy when a section changes height.
+- A formation sits to the opposite side from its hop's copy. Once the copy
+  un-anchors on a narrow screen there is nothing to make room for and that
+  offset would push the formation off the edge, so the camera tracks across to
+  it instead and drops to lift it above the stacked text.
+- Anchoring is gated on viewport width, not on the GPU tier — it is a few style
+  writes per frame. The tier check also no longer demotes on `hardwareConcurrency
+  <= 4`, which was catching ordinary laptops.
+- Anchored blocks start hidden; the update loop skips anything already offscreen,
+  so a block whose hop is far down the corridor would otherwise sit unplaced.
+
+beats.js is removed — route.js supersedes it.
+
+Verified at 1440, 1280, 820, 390 and 320px: no horizontal overflow, no console
+errors, and the corridor walked end to end checking that each anchored block
+enters, holds inside the viewport, and leaves.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019ayWFJPobMWqGx13R5GaWP
+---
+ README.md         |  38 ++--
+ anchor.js         | 122 +++++++++++++
+ app.js            |   7 +
+ beats.js          | 272 ---------------------------
+ index.html        |   4 +-
+ route.js          | 326 +++++++++++++++++++++++++++++++++
+ scripts/build.mjs |   2 +-
+ styles.css        |  43 +++++
+ world.js          | 454 ++++++++++++++++++++++++----------------------
+ 9 files changed, 769 insertions(+), 499 deletions(-)
+ create mode 100644 anchor.js
+ delete mode 100644 beats.js
+ create mode 100644 route.js
+
+diff --git a/README.md b/README.md
+index 0ddddb9..0af54b5 100644
+--- a/README.md
++++ b/README.md
+@@ -2,12 +2,17 @@
+ 
+ A light, warm, fast portfolio. Hero → selected work → journey → toolbox → proof → contact.
+ 
+-The page is one continuous 3D shot. Scroll position drives a camera through eight beats,
+-from a single node on a desk in a small room to a serverless system a hospital runs on.
+-There are no cuts: the same ~1800 points are rearranged from beat to beat, so the node
+-that opens the film is the node that ends it. Everything else is flat HTML, CSS, and
+-inline SVG, and the whole world is a background layer — remove it and the site is the
+-same flat, fast page it has always been.
++The page is one request. Scroll moves a camera down a corridor past eleven hops — from
++`GET /balwinder-singh` at the top, through every service in the career in the order it
++was built, to `200 OK` at the bottom. The route is not a metaphor borrowed from
++somewhere else: the hops are the real `flow` arrays already in `data.js`
++(`Patient → API Gateway → Lambda → PostgreSQL`).
++
++Copy at a hop is anchored *into* the corridor rather than laid over it — ordinary HTML,
++given one transform per frame computed from the same camera that draws the world. It is
++still selectable, searchable and reachable by a screen reader; the scene only decides
++where it goes. Remove the world and the site is the same flat, fast page it has always
++been.
+ 
+ ## Run locally
+ 
+@@ -39,7 +44,8 @@ npm test          # screenshots + overflow/console check at 5 viewports
+ | `data.js` | Every fact on the site: profile, projects, chapters, toolbox, achievements |
+ | `app.js` | Renders each section, wires the dialog, nav, scroll reveal, and hero mount |
+ | `diagrams.js` | Animated inline-SVG architecture diagrams, one per project |
+-| `beats.js` | The shot list: eight point arrangements, each with its camera |
++| `route.js` | The route: eleven hops, their formations, and where each one's copy pins |
++| `anchor.js` | Projects a 3D point to screen coordinates and drives one HTML block |
+ | `motion.js` | Content choreography — entrances, parallax, spread, split headings |
+ | `world.js` | The rig — fixed canvas, scroll driver, damped camera, render loop |
+ | `styles.css` | The whole design system: tokens, layout, components, responsive rules |
+@@ -68,10 +74,20 @@ the journey draws its own spine. Entrances latch: once an element arrives it get
+ `.is-in`, which is also what turns its transition back on so hover states animate
+ without smearing the entrance.
+ 
+-**It costs three draw calls.** Nodes are one `InstancedMesh`, edges one `LineSegments`,
+-dust one `Points`. Instance buffers are only rewritten when the morph actually advances,
+-and the render loop stops once nothing is left to settle. `MEASUREMENT` sets its drift
+-rate to zero, so a camera parked on that beat renders nothing at all.
++**Nothing moves but the camera.** A request travels, it does not morph, so the point
++budget is split between the hops and each group is parked at its own depth. Positions are
++written to the GPU once at load and never touched again: a frame is a camera update, an
++anchor pass, and two draw calls. The loop stops once nothing is left to settle.
++
++**Depth comes from fog.** On a light background there is no darkness to recede into and
++no glow to fall off. Fog set to the page's own `--paper` does it — distance dissolves
++into the background as if the paper were air — and it is tight on purpose, because it
++has to close before the next hop comes into view or a formation two hops ahead reads as
++clutter behind the copy you are reading.
++
++**Hops are tied to the document, not to a scroll percentage.** Each hop with a section of
++its own records the scroll offset where that section is centred, and hops in between are
++spread evenly across the gap. Sections can grow or shrink and the camera stays with them.
+ 
+ **Diagrams over decoration.** Each project card shows the actual request path — the
+ travelling pulse follows the same `flow` array printed in the case study. Motion is
+diff --git a/anchor.js b/anchor.js
+new file mode 100644
+index 0000000..bebca32
+--- /dev/null
++++ b/anchor.js
+@@ -0,0 +1,122 @@
++import * as THREE from './assets/vendor/three.module.js';
++
++/**
++ * Anchored copy: real HTML, positioned from the 3D scene.
++ *
++ * A card sitting in front of a canvas always reads as a card, because it never
++ * agrees with what is behind it. Here each block is pinned to a point in the
++ * corridor and given one `transform` per frame, computed by projecting that
++ * point through the same camera that draws the world. The text arrives out of
++ * depth, holds while it is beside the camera, and leaves past the shoulder —
++ * because the node it belongs to does.
++ *
++ * Why HTML rather than text drawn into the canvas: it stays selectable,
++ * searchable, translatable, reachable by a screen reader, and styled by the
++ * same stylesheet as the rest of the site. The scene only decides where it goes.
++ *
++ * Deliberately restrained on scale. Depth is carried by position and opacity;
++ * scaling runs over a narrow range because large scale factors on live text
++ * look soft and cost real paint time.
++ */
++
++const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
++
++/** Beyond this distance a block is not worth drawing. */
++const FAR = 15.5;
++/** Inside this distance it has gone past the camera's shoulder. */
++const NEAR = 1.4;
++
++export class Anchors {
++  constructor(camera) {
++    this.camera = camera;
++    this.items = [];
++    this.probe = new THREE.Vector3();
++    this.enabled = false;
++  }
++
++  /**
++   * @param element  the block to position
++   * @param position world-space point it is pinned to
++   */
++  add(element, position) {
++    if (!element) return;
++    element.classList.add('anchored');
++    // Start hidden. A block whose hop is far down the corridor is out of range
++    // on the first frame, and the update loop skips anything already offscreen —
++    // so without this it would sit there, positioned but never placed.
++    element.hidden = true;
++    this.items.push({
++      element,
++      position: new THREE.Vector3(position[0], position[1], position[2]),
++      shown: false,
++      live: false,
++    });
++  }
++
++  /** Hand every block back to normal document flow. */
++  release() {
++    this.enabled = false;
++    for (const item of this.items) {
++      item.element.classList.remove('anchored', 'anchor-live');
++      item.element.style.transform = '';
++      item.element.style.opacity = '';
++      item.element.hidden = false;
++      item.shown = false;
++      item.live = false;
++    }
++  }
++
++  update() {
++    if (!this.enabled) return;
++
++    const halfW = innerWidth / 2;
++    const halfH = innerHeight / 2;
++    const camera = this.camera;
++
++    for (const item of this.items) {
++      // Distance along the camera's own forward axis, not straight-line
++      // distance — a block off to one side should not read as further away.
++      const depth = camera.position.z - item.position.z;
++
++      if (depth < NEAR || depth > FAR) {
++        if (item.shown) {
++          item.element.hidden = true;
++          item.element.classList.remove('anchor-live');
++          item.shown = false;
++          item.live = false;
++        }
++        continue;
++      }
++
++      if (!item.shown) {
++        item.element.hidden = false;
++        item.shown = true;
++      }
++
++      this.probe.copy(item.position).project(camera);
++
++      const x = this.probe.x * halfW + halfW;
++      const y = -this.probe.y * halfH + halfH;
++
++      // In front of the camera for a while, then receding.
++      const approach = clamp((FAR - depth) / (FAR * 0.42), 0, 1);
++      const leaving = clamp((depth - NEAR) / 2.6, 0, 1);
++      const opacity = approach * leaving;
++
++      // A narrow range: enough to feel like depth, not enough to blur the type.
++      const scale = clamp(0.86 + (1 - depth / FAR) * 0.22, 0.86, 1.06);
++
++      item.element.style.transform =
++        `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) scale(${scale.toFixed(3)}) translate(-50%, -50%)`;
++      item.element.style.opacity = opacity.toFixed(3);
++
++      // Only the block the camera is actually beside takes clicks, so a fading
++      // neighbour can never swallow a link.
++      const live = opacity > 0.62;
++      if (live !== item.live) {
++        item.element.classList.toggle('anchor-live', live);
++        item.live = live;
++      }
++    }
++  }
++}
+diff --git a/app.js b/app.js
+index 4792b35..085a542 100644
+--- a/app.js
++++ b/app.js
+@@ -328,6 +328,13 @@ async function mountWorld() {
+ 
+     world = new World($('#world'), { tier });
+     document.body.classList.add('world-on');
++
++    // Push 1 wires the two ends of the route. The hops between them are
++    // travelled but not yet anchored, so their sections stay in normal flow.
++    world.bindAnchors({
++      dispatch: $('#hop-dispatch'),
++      ok: $('#hop-ok'),
++    });
+   } catch (error) {
+     console.warn('The world could not start; falling back to the flat site.', error);
+     document.body.classList.add('no-webgl');
+diff --git a/beats.js b/beats.js
+deleted file mode 100644
+index 206269c..0000000
+--- a/beats.js
++++ /dev/null
+@@ -1,272 +0,0 @@
+-/**
+- * The eight beats of the single continuous take.
+- *
+- * Every beat describes the same ~1800 points in a different arrangement. Nothing
+- * is ever added or removed between beats — the take has no cuts, so the node that
+- * opens the film as one curious question is the same node that ends up as a
+- * Lambda function. Morphing is a linear interpolation between two of these
+- * position sets, which is why the whole thing costs one pass over a Float32Array.
+- *
+- * Each beat also carries its camera. `pos` and `look` are world units, `fov` is
+- * vertical degrees. `spin` is the drift rate of the world in radians per second —
+- * MEASUREMENT sets it to zero, because that is the one shot where the camera locks
+- * off and the film stops being pretty and starts being rigorous.
+- *
+- * `framing` shifts the subject right of centre on wide screens so the hero copy
+- * has the left half of the frame to itself. On narrow screens it is ignored.
+- */
+-
+-/** The site's six accent hues, so the world is coloured by the same palette as the page. */
+-export const PALETTE = [0xf2604a, 0xf2a03d, 0x3fa87b, 0x3f8fd4, 0x7b62d9, 0xe0577f];
+-
+-export const TIERS = {
+-  full: { nodes: 1800, dust: 900, dpr: 2, idleSpin: true },
+-  lite: { nodes: 620, dust: 260, dpr: 1.5, idleSpin: false },
+-};
+-
+-/** Deterministic PRNG — the world should frame identically on every load. */
+-function makeRandom(seed) {
+-  let s = seed >>> 0;
+-  return () => {
+-    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+-    return s / 4294967296;
+-  };
+-}
+-
+-const GOLDEN = Math.PI * (3 - Math.sqrt(5));
+-
+-/** Even points on a sphere. The even spread is what reads as a network, not a blob. */
+-function fibonacci(out, o, i, count, radius) {
+-  const y = count === 1 ? 0 : 1 - (i / (count - 1)) * 2;
+-  const r = Math.sqrt(Math.max(0, 1 - y * y));
+-  const theta = GOLDEN * i;
+-  out[o] = Math.cos(theta) * r * radius;
+-  out[o + 1] = y * radius;
+-  out[o + 2] = Math.sin(theta) * r * radius;
+-}
+-
+-/* ==========================================================================
+-   Shapes — one per beat
+-   ========================================================================== */
+-
+-/** 00 · A single node on a desk. Tight enough that the cluster reads as one object. */
+-function room(n) {
+-  const a = new Float32Array(n * 3);
+-  const rnd = makeRandom(1101);
+-  for (let i = 0; i < n; i++) {
+-    fibonacci(a, i * 3, i, n, 0.26 + rnd() * 0.1);
+-  }
+-  return a;
+-}
+-
+-/** 01 · It comes apart. Taking things apart and putting them back, staged literally. */
+-function question(n) {
+-  const a = new Float32Array(n * 3);
+-  const rnd = makeRandom(2202);
+-  for (let i = 0; i < n; i++) {
+-    const o = i * 3;
+-    fibonacci(a, o, i, n, 2.1 + rnd() * 1.2);
+-    // Fragments, not a smooth shell: push clusters of indices out together.
+-    const shard = 1 + Math.sin(i * 0.7) * 0.22;
+-    a[o] *= shard; a[o + 1] *= shard; a[o + 2] *= shard;
+-  }
+-  return a;
+-}
+-
+-/** 02 · Guessing becomes reasoning. Fragments lock into an ordered lattice. */
+-function structure(n) {
+-  const a = new Float32Array(n * 3);
+-  const side = Math.max(2, Math.round(Math.cbrt(n)));
+-  const span = 3.1;
+-  for (let i = 0; i < n; i++) {
+-    const o = i * 3;
+-    const x = i % side;
+-    const y = Math.floor(i / side) % side;
+-    const z = Math.floor(i / (side * side)) % side;
+-    a[o] = (x / (side - 1) - 0.5) * span;
+-    a[o + 1] = (y / (side - 1) - 0.5) * span;
+-    a[o + 2] = (z / (side - 1) - 0.5) * span;
+-  }
+-  return a;
+-}
+-
+-/** 03 · The lattice curves into a lens, and a waveform runs through it. */
+-function sight(n) {
+-  const a = new Float32Array(n * 3);
+-  const rnd = makeRandom(3303);
+-  for (let i = 0; i < n; i++) {
+-    const o = i * 3;
+-    const u = n === 1 ? 0 : i / (n - 1);
+-    if (i % 5 === 0) {
+-      // The voice: a wave crossing the frame, loudest in the middle.
+-      const t = u * 2 - 1;
+-      a[o] = t * 3.4;
+-      a[o + 1] = Math.sin(t * 8.5) * 0.62 * (1 - Math.abs(t) * 0.55);
+-      a[o + 2] = (rnd() - 0.5) * 0.12;
+-    } else {
+-      // The eye: concentric rings bowed toward the camera.
+-      const ring = 0.45 + (i % 4) * 0.34;
+-      const ang = u * Math.PI * 2 * 11 + ring;
+-      a[o] = Math.cos(ang) * ring;
+-      a[o + 1] = Math.sin(ang) * ring;
+-      a[o + 2] = 0.9 - ring * ring * 0.85;
+-    }
+-  }
+-  return a;
+-}
+-
+-/** 04 · YOLOv8, Faster R-CNN, SSD — measured against each other. */
+-function measurement(n) {
+-  const a = new Float32Array(n * 3);
+-  const rnd = makeRandom(4404);
+-  const heights = [2.15, 1.52, 1.0];
+-  for (let i = 0; i < n; i++) {
+-    const o = i * 3;
+-    const col = i % 3;
+-    const k = Math.floor(i / 3) / Math.max(1, Math.floor(n / 3));
+-    a[o] = (col - 1) * 1.45 + (rnd() - 0.5) * 0.5;
+-    a[o + 1] = k * heights[col] - 1.15;
+-    a[o + 2] = (rnd() - 0.5) * 0.5;
+-  }
+-  return a;
+-}
+-
+-/** 05 · One machine becomes a region. The cluster replicates across a plane. */
+-function deploy(n) {
+-  const a = new Float32Array(n * 3);
+-  const rnd = makeRandom(5505);
+-  const cells = 5;
+-  const per = Math.max(1, Math.floor(n / (cells * cells)));
+-  for (let i = 0; i < n; i++) {
+-    const o = i * 3;
+-    const cell = Math.min(cells * cells - 1, Math.floor(i / per));
+-    const cx = (cell % cells) - (cells - 1) / 2;
+-    const cz = Math.floor(cell / cells) - (cells - 1) / 2;
+-    a[o] = cx * 1.7 + (rnd() - 0.5) * 0.72;
+-    a[o + 1] = (rnd() - 0.5) * 0.5;
+-    a[o + 2] = cz * 1.7 + (rnd() - 0.5) * 0.72;
+-  }
+-  return a;
+-}
+-
+-/** 06 · The full distributed system. The scene the site used to open with, arriving as the destination. */
+-function production(n) {
+-  const a = new Float32Array(n * 3);
+-  const rnd = makeRandom(6606);
+-  for (let i = 0; i < n; i++) {
+-    const o = i * 3;
+-    fibonacci(a, o, i, n, 3.4);
+-    const j = 0.22;
+-    a[o] += (rnd() - 0.5) * j;
+-    a[o + 1] += (rnd() - 0.5) * j;
+-    a[o + 2] += (rnd() - 0.5) * j;
+-  }
+-  return a;
+-}
+-
+-/** 07 · Back to one warm light, with the whole journey behind it. */
+-function pullOut(n) {
+-  const a = new Float32Array(n * 3);
+-  const rnd = makeRandom(7707);
+-  for (let i = 0; i < n; i++) {
+-    fibonacci(a, i * 3, i, n, 0.22 + rnd() * 0.08);
+-  }
+-  return a;
+-}
+-
+-/* ==========================================================================
+-   The shot list
+-   ========================================================================== */
+-
+-export const BEATS = [
+-  {
+-    id: 'room', slug: 'INT. SMALL ROOM', tone: 0xf2604a, shape: room,
+-    camera: { pos: [0, 0.05, 4.6], look: [0, 0, 0], fov: 34 },
+-    nodeScale: 0.5, edges: 0, spin: 0.05, framing: 0.97,
+-  },
+-  {
+-    id: 'question', slug: 'THE QUESTION', tone: 0xf2604a, shape: question,
+-    camera: { pos: [0, 0.2, 11.5], look: [0, 0, 0], fov: 40 },
+-    nodeScale: 0.85, edges: 0.04, spin: 0.06, framing: 0.5,
+-  },
+-  {
+-    id: 'structure', slug: 'STRUCTURE', tone: 0xf2a03d, shape: structure,
+-    camera: { pos: [3.0, 2.2, 6.4], look: [0, 0, 0], fov: 38 },
+-    nodeScale: 0.8, edges: 0, spin: 0.05, framing: 0,
+-  },
+-  {
+-    id: 'sight', slug: 'SIGHT & SOUND', tone: 0x3fa87b, shape: sight,
+-    camera: { pos: [0, 0, 3.0], look: [0, 0, -0.2], fov: 52 },
+-    nodeScale: 0.4, edges: 0, spin: 0.03, framing: 0,
+-  },
+-  {
+-    id: 'measurement', slug: 'MEASUREMENT', tone: 0x3f8fd4, shape: measurement,
+-    camera: { pos: [0, 0.3, 7.6], look: [0, 0.1, 0], fov: 26 },
+-    nodeScale: 0.55, edges: 0, spin: 0, framing: 0,
+-  },
+-  {
+-    id: 'deploy', slug: 'DEPLOY', tone: 0x7b62d9, shape: deploy,
+-    camera: { pos: [0, 5.0, 8.4], look: [0, -0.5, 0], fov: 44 },
+-    nodeScale: 0.75, edges: 0.09, spin: 0.04, framing: 0,
+-  },
+-  {
+-    id: 'production', slug: 'PRODUCTION', tone: 0xe0577f, shape: production,
+-    camera: { pos: [0, 0.7, 11.0], look: [0, 0, 0], fov: 38 },
+-    nodeScale: 1.55, edges: 0.34, spin: 0.08, framing: 0,
+-  },
+-  {
+-    id: 'pullout', slug: 'PULL OUT', tone: 0xf2a03d, shape: pullOut,
+-    camera: { pos: [0, 0, 19.0], look: [0, 0, 0], fov: 30 },
+-    nodeScale: 1.2, edges: 0.16, spin: 0.05, framing: 0,
+-  },
+-];
+-
+-/** Build every beat's position set once, up front. */
+-export function buildShapes(count) {
+-  return BEATS.map((beat) => beat.shape(count));
+-}
+-
+-/**
+- * Edge pairs, derived from PRODUCTION — the one arrangement where "nearest
+- * neighbour" means something. Edges fade to nothing through the early beats
+- * rather than being rebuilt, so the take never cuts; they only come up once the
+- * world has become a system again.
+- */
+-export function buildEdges(positions, perNode = 2) {
+-  const count = positions.length / 3;
+-  const seen = new Set();
+-  const pairs = [];
+-  // A coarse spatial hash keeps this linear enough to run at load without a hitch.
+-  const near = [];
+-
+-  for (let i = 0; i < count; i++) {
+-    const ax = positions[i * 3];
+-    const ay = positions[i * 3 + 1];
+-    const az = positions[i * 3 + 2];
+-    near.length = 0;
+-
+-    for (let j = 0; j < count; j++) {
+-      if (j === i) continue;
+-      const dx = positions[j * 3] - ax;
+-      const dy = positions[j * 3 + 1] - ay;
+-      const dz = positions[j * 3 + 2] - az;
+-      const d = dx * dx + dy * dy + dz * dz;
+-      if (near.length < perNode) {
+-        near.push({ j, d });
+-        near.sort((p, q) => p.d - q.d);
+-      } else if (d < near[near.length - 1].d) {
+-        near[near.length - 1] = { j, d };
+-        near.sort((p, q) => p.d - q.d);
+-      }
+-    }
+-
+-    for (const { j } of near) {
+-      const key = i < j ? `${i}:${j}` : `${j}:${i}`;
+-      if (seen.has(key)) continue;
+-      seen.add(key);
+-      pairs.push(i, j);
+-    }
+-  }
+-
+-  return Uint32Array.from(pairs);
+-}
+diff --git a/index.html b/index.html
+index d27d051..0a228d8 100644
+--- a/index.html
++++ b/index.html
+@@ -57,7 +57,7 @@
+     <!-- Shot 00 of the take: tight on a single node, before anything else exists. -->
+     <section class="hero">
+       <div class="wrap hero-grid">
+-        <div class="hero-copy">
++        <div class="hero-copy hop-body" id="hop-dispatch">
+           <p class="status">
+             <span class="status-dot" aria-hidden="true"></span>
+             <span id="status-text">Open to new roles</span>
+@@ -136,7 +136,7 @@
+ 
+     <section class="section" id="contact" aria-labelledby="contact-title">
+       <div class="wrap">
+-        <div class="contact-card reveal">
++        <div class="contact-card reveal hop-body" id="hop-ok">
+           <div class="contact-inner">
+             <h2 id="contact-title" data-split>Let's build something people depend on</h2>
+             <p id="contact-lead"></p>
+diff --git a/route.js b/route.js
+new file mode 100644
+index 0000000..db31ff5
+--- /dev/null
++++ b/route.js
+@@ -0,0 +1,326 @@
++/**
++ * The route: one request, eleven hops, travelled in a straight line.
++ *
++ * The previous world kept one cloud and morphed it from beat to beat. A request
++ * does not morph — it travels, and it passes things. So the point budget is
++ * divided between the hops, each group arranged into that hop's own formation
++ * and parked at its own depth down the corridor. The camera flies through them.
++ *
++ * That has a useful consequence: positions never change after load, so the
++ * instance buffer is written exactly once and a frame costs a camera update and
++ * a draw. Nothing is rewritten while you scroll.
++ *
++ * Distances are world units. The corridor runs along -Z, so hop `i` sits at
++ * `-i * SPACING` and the camera starts just in front of hop 00.
++ */
++
++export const SPACING = 11;
++export const CAMERA_LEAD = 5.6;
++
++/**
++ * How far a formation sits to the side of the corridor's axis. A hop's copy is
++ * pinned on one side, so its formation is pushed to the other — otherwise the
++ * two land on top of each other in the middle of frame and neither reads.
++ */
++export const FORMATION_OFFSET = 2.8;
++
++/** Deterministic, so the corridor is laid out identically on every load. */
++function makeRandom(seed) {
++  let s = seed >>> 0;
++  return () => {
++    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
++    return s / 4294967296;
++  };
++}
++
++const TAU = Math.PI * 2;
++
++/* ==========================================================================
++   Formations — each one is a hop's shape, in its own local space
++   ========================================================================== */
++
++/** A single tight node. Nothing has happened yet. */
++function seed(n, rnd) {
++  const out = [];
++  for (let i = 0; i < n; i++) {
++    const a = rnd() * TAU;
++    const b = Math.acos(2 * rnd() - 1);
++    const r = 0.24 + rnd() * 0.16;
++    out.push([Math.sin(b) * Math.cos(a) * r, Math.sin(b) * Math.sin(a) * r, Math.cos(b) * r]);
++  }
++  return out;
++}
++
++/** Broken apart and not yet put back. */
++function shards(n, rnd) {
++  const out = [];
++  for (let i = 0; i < n; i++) {
++    const a = rnd() * TAU;
++    const b = Math.acos(2 * rnd() - 1);
++    const r = 1.1 + rnd() * 1.5;
++    const chunk = 1 + Math.sin(i * 0.9) * 0.3;
++    out.push([
++      Math.sin(b) * Math.cos(a) * r * chunk,
++      Math.sin(b) * Math.sin(a) * r * chunk,
++      Math.cos(b) * r * 0.5,
++    ]);
++  }
++  return out;
++}
++
++/** Order arrives: an ordered lattice. */
++function lattice(n, rnd) {
++  const out = [];
++  const side = Math.max(2, Math.round(Math.cbrt(n)));
++  for (let i = 0; i < n; i++) {
++    const x = i % side;
++    const y = Math.floor(i / side) % side;
++    const z = Math.floor(i / (side * side)) % side;
++    out.push([
++      (x / (side - 1) - 0.5) * 3.2 + (rnd() - 0.5) * 0.06,
++      (y / (side - 1) - 0.5) * 3.2 + (rnd() - 0.5) * 0.06,
++      (z / (side - 1) - 0.5) * 1.6,
++    ]);
++  }
++  return out;
++}
++
++/** A door the request has to be let through. */
++function gate(n, rnd) {
++  const out = [];
++  for (let i = 0; i < n; i++) {
++    const ring = i % 3;
++    const r = 1.5 + ring * 0.42;
++    const a = rnd() * TAU;
++    out.push([
++      Math.cos(a) * r,
++      Math.sin(a) * r,
++      (rnd() - 0.5) * 0.5 - ring * 0.2,
++    ]);
++  }
++  return out;
++}
++
++/** Stages chained one into the next. `steps` comes from a project's real flow. */
++function chain(n, rnd, steps = 4) {
++  const out = [];
++  const span = 4.4;
++  for (let i = 0; i < n; i++) {
++    const stage = i % steps;
++    const x = (stage / (steps - 1) - 0.5) * span;
++    const tight = rnd() < 0.72;
++    const r = tight ? 0.36 : 0.9;
++    const a = rnd() * TAU;
++    out.push([
++      x + (rnd() - 0.5) * 0.34,
++      Math.cos(a) * r,
++      Math.sin(a) * r,
++    ]);
++  }
++  return out;
++}
++
++/** Three approaches measured against each other. */
++function bars(n, rnd) {
++  const out = [];
++  const heights = [2.3, 1.62, 1.05];
++  for (let i = 0; i < n; i++) {
++    const col = i % 3;
++    const k = rnd();
++    out.push([
++      (col - 1) * 1.5 + (rnd() - 0.5) * 0.46,
++      k * heights[col] - 1.2,
++      (rnd() - 0.5) * 0.46,
++    ]);
++  }
++  return out;
++}
++
++/** One machine copied across a region. */
++function fan(n, rnd) {
++  const out = [];
++  const cells = 4;
++  for (let i = 0; i < n; i++) {
++    const cell = i % (cells * cells);
++    const cx = (cell % cells) - (cells - 1) / 2;
++    const cy = Math.floor(cell / cells) - (cells - 1) / 2;
++    out.push([
++      cx * 1.45 + (rnd() - 0.5) * 0.6,
++      cy * 1.15 + (rnd() - 0.5) * 0.5,
++      (rnd() - 0.5) * 1.4,
++    ]);
++  }
++  return out;
++}
++
++/** The live system: dense, even, and carrying traffic. */
++function mesh(n, rnd) {
++  const out = [];
++  const golden = Math.PI * (3 - Math.sqrt(5));
++  for (let i = 0; i < n; i++) {
++    const y = 1 - (i / Math.max(1, n - 1)) * 2;
++    const r = Math.sqrt(Math.max(0, 1 - y * y));
++    const th = golden * i;
++    const rad = 2.5;
++    out.push([
++      Math.cos(th) * r * rad + (rnd() - 0.5) * 0.16,
++      y * rad + (rnd() - 0.5) * 0.16,
++      Math.sin(th) * r * rad + (rnd() - 0.5) * 0.16,
++    ]);
++  }
++  return out;
++}
++
++/** What the route was built from: clustered groups, loosely linked. */
++function graph(n, rnd) {
++  const out = [];
++  const groups = 6;
++  for (let i = 0; i < n; i++) {
++    const g = i % groups;
++    const a = (g / groups) * TAU;
++    const gx = Math.cos(a) * 2.1;
++    const gy = Math.sin(a) * 1.6;
++    out.push([
++      gx + (rnd() - 0.5) * 0.95,
++      gy + (rnd() - 0.5) * 0.95,
++      (rnd() - 0.5) * 0.95,
++    ]);
++  }
++  return out;
++}
++
++/** Readings, laid out flat like a panel at the end of a trace. */
++function panel(n, rnd) {
++  const out = [];
++  for (let i = 0; i < n; i++) {
++    const col = i % 4;
++    out.push([
++      (col - 1.5) * 1.3 + (rnd() - 0.5) * 0.75,
++      (rnd() - 0.5) * 1.9,
++      (rnd() - 0.5) * 0.4,
++    ]);
++  }
++  return out;
++}
++
++/** The response, opening outward. */
++function bloom(n, rnd) {
++  const out = [];
++  for (let i = 0; i < n; i++) {
++    const a = rnd() * TAU;
++    const b = Math.acos(2 * rnd() - 1);
++    const r = 0.4 + Math.pow(rnd(), 0.4) * 2.6;
++    out.push([
++      Math.sin(b) * Math.cos(a) * r,
++      Math.sin(b) * Math.sin(a) * r,
++      Math.cos(b) * r * 0.7,
++    ]);
++  }
++  return out;
++}
++
++/* ==========================================================================
++   The route
++   ========================================================================== */
++
++/**
++ * `weight` is this hop's share of the point budget — the live system earns more
++ * points than the hops on either side of it. `anchor` is where the hop's copy
++ * pins in the hop's local space, so the text sits beside its formation rather
++ * than on top of it.
++ */
++export const HOPS = [
++  {
++    id: 'dispatch', name: 'DISPATCH', label: 'GET /balwinder-singh', section: '.hero',
++    tone: 0xf2604a, shape: seed, weight: 0.7, anchor: [-2.4, 0.2, 0],
++  },
++  {
++    id: 'origin', name: 'origin', label: 'origin · a small room',
++    tone: 0xf2604a, shape: shards, weight: 0.9, anchor: [2.8, 0.4, 0],
++  },
++  {
++    id: 'resolve', name: 'resolve', label: 'resolve · B.E. CSE',
++    tone: 0xf2a03d, shape: lattice, weight: 1, anchor: [-3.1, 0.3, 0],
++  },
++  {
++    id: 'facemeet', name: 'auth.facemeet', label: 'auth.facemeet · 2023',
++    tone: 0xf2604a, shape: gate, weight: 1, anchor: [3.1, 0.2, 0],
++  },
++  {
++    id: 'doctorg', name: 'vision.doctorg', label: 'vision.doctorg · 2024',
++    tone: 0x7b62d9, shape: chain, weight: 1, anchor: [-3.2, 0.9, 0],
++  },
++  {
++    id: 'research', name: 'bench.ieee', label: 'bench.ieee · 2024 / 2025',
++    tone: 0x3f8fd4, shape: bars, weight: 1, anchor: [3.0, 0.4, 0],
++  },
++  {
++    id: 'agristore', name: 'commerce.agristore', label: 'commerce.agristore · 2025',
++    tone: 0x3fa87b, shape: fan, weight: 1.05, anchor: [-3.3, 0.3, 0],
++  },
++  {
++    id: 'arovita', name: 'hms.arovita', label: 'hms.arovita · LIVE',
++    tone: 0xe0577f, shape: mesh, weight: 1.6, anchor: [3.4, 0.2, 0],
++  },
++  {
++    id: 'deps', name: 'deps', label: 'deps · the toolbox', section: '#toolbox',
++    tone: 0xf2a03d, shape: graph, weight: 1.1, anchor: [-3.2, 0.2, 0],
++  },
++  {
++    id: 'metrics', name: 'metrics', label: 'metrics · evidence', section: '#proof',
++    tone: 0x3f8fd4, shape: panel, weight: 0.9, anchor: [3.0, 0.3, 0],
++  },
++  {
++    id: 'ok', name: '200 OK', label: '200 OK · response', section: '#contact',
++    tone: 0x3fa87b, shape: bloom, weight: 1.1, anchor: [0, 0, 0],
++  },
++];
++
++/** How far hop `i`'s formation sits from the corridor axis, and which way. */
++export const formationShift = (i) =>
++  -Math.sign(HOPS[i].anchor[0] || 1) * FORMATION_OFFSET;
++
++/** Depth of hop `i` down the corridor. */
++export const hopZ = (i) => -i * SPACING;
++
++/** Total travel, from the camera's start to its position at the final hop. */
++export const routeLength = () => (HOPS.length - 1) * SPACING;
++
++/**
++ * Lay the whole corridor out once: every point's final position and which hop
++ * owns it. Positions are absolute, so the caller writes them to the GPU a
++ * single time and never touches them again.
++ */
++export function buildCorridor(budget) {
++  const total = HOPS.reduce((sum, hop) => sum + hop.weight, 0);
++  const positions = new Float32Array(budget * 3);
++  const owner = new Uint8Array(budget);
++
++  let cursor = 0;
++  HOPS.forEach((hop, index) => {
++    const isLast = index === HOPS.length - 1;
++    const share = isLast
++      ? budget - cursor
++      : Math.max(1, Math.round((hop.weight / total) * budget));
++    const count = Math.min(share, budget - cursor);
++    if (count <= 0) return;
++
++    const rnd = makeRandom(1000 + index * 977);
++    const points = hop.shape(count, rnd, hop.steps);
++    const z = hopZ(index);
++    // Opposite whichever side the copy is pinned to.
++    const shift = formationShift(index);
++
++    for (let i = 0; i < count; i++) {
++      const p = points[i] || [0, 0, 0];
++      const o = (cursor + i) * 3;
++      positions[o] = p[0] + shift;
++      positions[o + 1] = p[1];
++      positions[o + 2] = p[2] + z;
++      owner[cursor + i] = index;
++    }
++    cursor += count;
++  });
++
++  return { positions, owner };
++}
+diff --git a/scripts/build.mjs b/scripts/build.mjs
+index f87a15f..37f86de 100644
+--- a/scripts/build.mjs
++++ b/scripts/build.mjs
+@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
+ const root = fileURLToPath(new URL('..', import.meta.url));
+ const output = resolve(root, 'dist');
+ 
+-const MODULES = ['app.js', 'beats.js', 'data.js', 'diagrams.js', 'motion.js', 'world.js'];
++const MODULES = ['anchor.js', 'app.js', 'data.js', 'diagrams.js', 'motion.js', 'route.js', 'world.js'];
+ const FILES = [...MODULES, 'index.html', 'styles.css', 'resume.html'];
+ 
+ for (const name of MODULES) {
+diff --git a/styles.css b/styles.css
+index ba1f694..9ba189b 100644
+--- a/styles.css
++++ b/styles.css
+@@ -711,6 +711,49 @@ img, svg, canvas { max-width: 100%; display: block; }
+   pointer-events: none;
+ }
+ 
++/* --------------------------------------------------------------------------
++   Anchored copy — real HTML, positioned from the 3D scene
++
++   A block pinned to a point in the corridor gets one `transform` per frame from
++   anchor.js. It is still ordinary markup: selectable, searchable, reachable by
++   a screen reader, styled by this stylesheet. The scene only decides where it
++   goes. Without `.anchors-on` — narrow screens, no WebGL, reduced motion — none
++   of this applies and every block stays in normal document flow.
++   -------------------------------------------------------------------------- */
++
++.anchored {
++  position: fixed;
++  left: 0;
++  top: 0;
++  z-index: 2;
++  width: var(--anchor-w, min(430px, 40vw));
++  max-width: calc(100vw - 48px);
++  /* Only the block the camera is beside takes clicks; see anchor.js. */
++  pointer-events: none;
++  /* The transform is rewritten every frame, so any transition would smear it. */
++  transition: none !important;
++  will-change: transform, opacity;
++}
++
++.anchored.anchor-live { pointer-events: auto; }
++
++#hop-dispatch { --anchor-w: min(560px, 46vw); }
++#hop-ok { --anchor-w: min(580px, 48vw); }
++
++/* An anchored block is centred on its point, so anything taller than the
++   viewport loses both ends. The contact card is the one block big enough to
++   hit this, so it tightens up while it is flying. */
++.anchors-on .contact-card { padding: clamp(26px, 2.8vw, 40px); }
++.anchors-on #hop-ok h2 { font-size: clamp(26px, 2.5vw, 34px); }
++.anchors-on #hop-ok .contact-links { gap: 10px 18px; }
++
++/* With the copy pinned into the corridor, the hero's stage is redundant and
++   each anchored section becomes the scroll distance its hop is travelled over. */
++.anchors-on .hero-stage { display: none; }
++.anchors-on .hero-grid { display: block; }
++.anchors-on .hero { min-height: 126vh; }
++.anchors-on #contact { min-height: 112vh; }
++
+ /* Content rides above the canvas. The header already sits at z-index 100. */
+ .world-on main,
+ .world-on .site-footer {
+diff --git a/world.js b/world.js
+index e0568c7..2472c85 100644
+--- a/world.js
++++ b/world.js
+@@ -1,61 +1,64 @@
+ import * as THREE from './assets/vendor/three.module.js';
+-import { BEATS, PALETTE, TIERS, buildShapes, buildEdges } from './beats.js';
++import { HOPS, SPACING, CAMERA_LEAD, buildCorridor, formationShift, hopZ, routeLength } from './route.js';
++import { Anchors } from './anchor.js';
+ 
+ /**
+- * The rig: one continuous shot through the whole page.
++ * The rig: one request travelling a corridor.
+  *
+- * A fixed, full-viewport canvas sits behind the document. The page scrolls
+- * normally — nothing is intercepted, no wheel handler, no scroll-jacking — and
+- * scroll position drives a camera that eases toward its target rather than
+- * snapping to it. That lag is the whole difference between a scroll effect and
+- * a camera move.
++ * Scroll moves the camera down -Z past eleven formations. Nothing morphs, so
++ * every point's position is written to the GPU once at load and never touched
++ * again; a frame is a camera update, an anchor pass, and a draw.
+  *
+- * Cost control
+- * - Three draw calls for the entire world: nodes, edges, dust.
+- * - Instance positions are only rewritten when the morph actually advances.
+- * - The loop stops when nothing is left to settle (and on tab blur). The `full`
+- *   tier keeps a slow idle drift so the world stays alive; `lite` freezes, which
+- *   is what keeps a phone cool on a long scroll.
++ * Depth on a light background is the hard part — there is no darkness to fade
++ * into and no glow to fall off. Fog set to the page's own paper colour does it:
++ * distant hops dissolve into the background exactly as if the paper were air.
++ *
++ * The page still scrolls normally. Nothing intercepts the wheel, the canvas
++ * takes no pointer events, and with this module absent the site is the flat,
++ * fast page it has always been.
+  */
+ 
+ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+-const smooth = (t) => t * t * (3 - 2 * t);
+ const mix = (a, b, t) => a + (b - a) * t;
+ 
+-/** Which version of the world this visitor gets, decided once at load. */
++const PALETTE = [0xf2604a, 0xf2a03d, 0x3fa87b, 0x3f8fd4, 0x7b62d9, 0xe0577f];
++const PAPER = 0xfdf8f3;
++
++export const TIERS = {
++  full: { points: 4200, dust: 700, dpr: 2 },
++  lite: { points: 1500, dust: 240, dpr: 1.5 },
++};
++
++/** Which version of the corridor this visitor gets, decided once at load. */
+ export function pickTier(reducedMotion) {
+   if (reducedMotion) return 'off';
+-
+   try {
+     const probe = document.createElement('canvas');
+     if (!(probe.getContext('webgl2') || probe.getContext('webgl'))) return 'off';
+   } catch {
+     return 'off';
+   }
+-
++  // Touch and viewport are the signals that actually mean "phone". Core count
++  // is a poor proxy — plenty of capable laptops report four.
+   const small = matchMedia('(max-width: 900px)').matches;
+-  const touch = navigator.maxTouchPoints > 1;
+   const cores = navigator.hardwareConcurrency || 4;
+-  return small || touch || cores <= 4 ? 'lite' : 'full';
++  return small || navigator.maxTouchPoints > 1 || cores <= 2 ? 'lite' : 'full';
+ }
+ 
+ export class World {
+   constructor(canvas, { tier = 'full' } = {}) {
+     this.canvas = canvas;
+     this.tier = TIERS[tier] ?? TIERS.full;
+-    this.count = this.tier.nodes;
+ 
+-    this.progress = 0;
+-    this.target = 0;
+-    this.spin = 0;
++    this.z = CAMERA_LEAD;
++    this.targetZ = CAMERA_LEAD;
++    this.stations = [];
+     this.pointer = { x: 0, y: 0 };
+     this.aim = { x: 0, y: 0 };
+-    this.morphKey = -1;
+     this.running = false;
+-    this.visible = true;
+     this.last = 0;
++    this.time = 0;
+ 
+-    // Throws when WebGL is unavailable; the caller falls back to the flat site.
+     this.renderer = new THREE.WebGLRenderer({
+       canvas,
+       antialias: true,
+@@ -68,124 +71,166 @@ export class World {
+     this.renderer.setClearColor(0x000000, 0);
+ 
+     this.scene = new THREE.Scene();
+-    this.camera = new THREE.PerspectiveCamera(38, 1, 0.1, 200);
+-    this.lookAt = new THREE.Vector3();
+-
+-    // Lit for warm paper: bright ambient, warm key, cool fill, no deep shadows.
+-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0xf1e5d8, 2.1));
+-    this.key = new THREE.DirectionalLight(0xfff4e6, 2.4);
+-    this.key.position.set(4, 6, 8);
+-    this.scene.add(this.key);
++    // The corridor's depth cue: distance dissolves into the page's own paper.
++    // Tight, deliberately — it has to close before the next hop comes into view,
++    // or a formation two hops ahead reads as clutter behind the copy you are
++    // currently reading.
++    this.scene.fog = new THREE.Fog(PAPER, 6, 18);
++
++    this.camera = new THREE.PerspectiveCamera(44, 1, 0.1, 60);
++    this.look = new THREE.Vector3();
++
++    this.scene.add(new THREE.HemisphereLight(0xffffff, 0xf1e5d8, 2.2));
++    const key = new THREE.DirectionalLight(0xfff4e6, 2.3);
++    key.position.set(4, 6, 8);
++    this.scene.add(key);
+     const fill = new THREE.DirectionalLight(0xdce9f7, 1.1);
+     fill.position.set(-6, -2, 4);
+     this.scene.add(fill);
+ 
+-    this.root = new THREE.Group();
+-    this.scene.add(this.root);
++    this.anchors = new Anchors(this.camera);
+ 
+-    this.shapes = buildShapes(this.count);
+     this.build();
+     this.resize();
+     this.bind();
+-    this.readScroll();
+-    this.progress = this.target;
+-    // Nothing has fired an event yet, so the opening frame has to be asked for.
++    this.measureStations();
++    this.readRoute();
++    this.z = this.targetZ;
+     this.wake();
+   }
+ 
+   /* ----------------------------------------------------------------------
+-     Geometry
++     The corridor, written once
+      ---------------------------------------------------------------------- */
+ 
+   build() {
+-    const count = this.count;
++    const count = this.tier.points;
++    const { positions, owner } = buildCorridor(count);
++    this.count = count;
+ 
+     const geometry = new THREE.IcosahedronGeometry(1, 0);
+-    // r185's fragment shader only applies vColor under USE_COLOR, so instance
+-    // colours alone are dropped. An all-white vertex colour attribute turns
+-    // USE_COLOR on and leaves instanceColor as the only thing tinting a node.
++    // r185 only applies vColor under USE_COLOR, so instance colours alone are
++    // dropped. An all-white vertex colour turns it on and leaves instanceColor
++    // as the only thing tinting a node.
+     const white = new Float32Array(geometry.attributes.position.count * 3).fill(1);
+     geometry.setAttribute('color', new THREE.BufferAttribute(white, 3));
+ 
+     this.nodes = new THREE.InstancedMesh(
+       geometry,
+-      new THREE.MeshStandardMaterial({
+-        vertexColors: true,
+-        roughness: 0.36,
+-        metalness: 0.08,
+-      }),
++      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.38, metalness: 0.06, fog: true }),
+       count,
+     );
+     this.nodes.frustumCulled = false;
+-    this.nodes.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+-    this.nodes.setColorAt(0, new THREE.Color(0xffffff)); // allocates instanceColor
+-    this.nodes.instanceColor.setUsage(THREE.DynamicDrawUsage);
+-    this.root.add(this.nodes);
+-
+-    // Per-node size variation, so the network reads with a hierarchy.
+-    this.sizes = new Float32Array(count);
+-    for (let i = 0; i < count; i++) this.sizes[i] = 0.055 * (0.62 + ((i * 37) % 11) / 9);
+-
+-    // Each node keeps one accent from the site palette; the beat's tone is mixed
+-    // over the top, so colour stays varied but the shot still has a cast.
+-    this.accents = new Float32Array(count * 3);
+-    const c = new THREE.Color();
++    this.nodes.setColorAt(0, new THREE.Color(0xffffff));
++
++    const matrix = this.nodes.instanceMatrix.array;
++    const colors = this.nodes.instanceColor.array;
++    const tone = new THREE.Color();
++    const accent = new THREE.Color();
++
+     for (let i = 0; i < count; i++) {
+-      c.setHex(PALETTE[i % PALETTE.length], THREE.SRGBColorSpace);
+-      this.accents[i * 3] = c.r;
+-      this.accents[i * 3 + 1] = c.g;
+-      this.accents[i * 3 + 2] = c.b;
++      const p = i * 3;
++      const m = i * 16;
++      // Size varies a little so a formation has some hierarchy in it.
++      const s = 0.036 * (0.7 + ((i * 37) % 13) / 9);
++
++      matrix[m] = s;
++      matrix[m + 5] = s;
++      matrix[m + 10] = s;
++      matrix[m + 12] = positions[p];
++      matrix[m + 13] = positions[p + 1];
++      matrix[m + 14] = positions[p + 2];
++      matrix[m + 15] = 1;
++
++      tone.setHex(HOPS[owner[i]].tone, THREE.SRGBColorSpace);
++      accent.setHex(PALETTE[i % PALETTE.length], THREE.SRGBColorSpace);
++      colors[p] = mix(accent.r, tone.r, 0.72);
++      colors[p + 1] = mix(accent.g, tone.g, 0.72);
++      colors[p + 2] = mix(accent.b, tone.b, 0.72);
+     }
+ 
+-    this.tones = BEATS.map((beat) => new THREE.Color().setHex(beat.tone, THREE.SRGBColorSpace));
+-
+-    // Edges come from PRODUCTION, the one arrangement where "nearest neighbour"
+-    // means something. They stay at zero opacity until the world is a system again.
+-    this.pairs = buildEdges(this.shapes[6], 2);
+-    const edgePositions = new Float32Array(this.pairs.length * 3);
+-    const edgeGeometry = new THREE.BufferGeometry();
+-    this.edgeAttribute = new THREE.BufferAttribute(edgePositions, 3);
+-    this.edgeAttribute.setUsage(THREE.DynamicDrawUsage);
+-    edgeGeometry.setAttribute('position', this.edgeAttribute);
+-    this.edges = new THREE.LineSegments(
+-      edgeGeometry,
+-      new THREE.LineBasicMaterial({ color: 0xc9ae95, transparent: true, opacity: 0 }),
+-    );
+-    this.edges.frustumCulled = false;
+-    this.root.add(this.edges);
++    this.nodes.instanceMatrix.needsUpdate = true;
++    this.nodes.instanceColor.needsUpdate = true;
++    this.scene.add(this.nodes);
+ 
+     this.buildDust();
+   }
+ 
+-  /** Ambient motes, so the camera has something to move through. */
++  /** Motes along the length of the corridor, so the travel has texture. */
+   buildDust() {
+     const n = this.tier.dust;
++    const length = routeLength();
+     const positions = new Float32Array(n * 3);
+     for (let i = 0; i < n; i++) {
+-      positions[i * 3] = (Math.random() - 0.5) * 34;
+-      positions[i * 3 + 1] = (Math.random() - 0.5) * 22;
+-      positions[i * 3 + 2] = (Math.random() - 0.5) * 30;
++      // Hollow: motes keep clear of the corridor's axis, so none of them ever
++      // drift across the copy the camera is currently beside.
++      const angle = Math.random() * Math.PI * 2;
++      const radius = 4.2 + Math.random() * 7;
++      positions[i * 3] = Math.cos(angle) * radius;
++      positions[i * 3 + 1] = Math.sin(angle) * radius * 0.72;
++      positions[i * 3 + 2] = CAMERA_LEAD - Math.random() * (length + SPACING * 2);
+     }
+     const geometry = new THREE.BufferGeometry();
+     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+     this.dust = new THREE.Points(geometry, new THREE.PointsMaterial({
+       color: 0xc2a488,
+-      size: 0.045,
++      size: 0.04,
+       sizeAttenuation: true,
+       transparent: true,
+-      opacity: 0.5,
++      opacity: 0.4,
+       depthWrite: false,
++      fog: true,
+     }));
+     this.dust.frustumCulled = false;
+     this.scene.add(this.dust);
+   }
+ 
++  /* ----------------------------------------------------------------------
++     Anchored copy
++     ---------------------------------------------------------------------- */
++
++  /**
++   * @param map  hop id -> element. A hop with no element simply has no copy.
++   */
++  bindAnchors(map) {
++    this.anchorMap = map;
++    this.anchors.items.length = 0;
++
++    HOPS.forEach((hop, index) => {
++      const element = map[hop.id];
++      if (!element) return;
++      this.anchors.add(element, [0, hop.anchor[1], hopZ(index)]);
++      // The x is decided by the viewport, not the route — see placeAnchors.
++      this.anchors.items[this.anchors.items.length - 1].side = Math.sign(hop.anchor[0]) || 1;
++    });
++
++    this.placeAnchors();
++    this.anchors.enabled = this.wide;
++    // Anchoring pulls blocks out of flow, which changes every section's offset.
++    requestAnimationFrame(() => { this.measureStations(); this.readRoute(); this.wake(); });
++    if (!this.anchors.enabled) this.anchors.release();
++    document.body.classList.toggle('anchors-on', this.anchors.enabled);
++  }
++
++  /**
++   * Copy sits a fixed fraction of the way out from the centre of frame, so it
++   * stays comfortably inside the viewport at any aspect ratio instead of
++   * drifting off the edge on a wide monitor.
++   */
++  placeAnchors() {
++    const halfH = Math.tan((this.camera.fov / 2) * (Math.PI / 180)) * CAMERA_LEAD;
++    const halfW = halfH * this.camera.aspect;
++    for (const item of this.anchors.items) {
++      item.position.x = (item.side ?? 1) * halfW * 0.44;
++    }
++  }
++
+   /* ----------------------------------------------------------------------
+      Input
+      ---------------------------------------------------------------------- */
+ 
+   bind() {
+-    this.onScroll = () => { this.readScroll(); this.wake(); };
++    this.onScroll = () => { this.readRoute(); this.wake(); };
+     addEventListener('scroll', this.onScroll, { passive: true });
+ 
+     this.onResize = () => { this.resize(); this.wake(); };
+@@ -198,33 +243,83 @@ export class World {
+     };
+     addEventListener('pointermove', this.onPointer, { passive: true });
+ 
+-    this.onVisibility = () => {
+-      if (document.hidden) this.stop();
+-      else this.wake();
+-    };
++    this.onVisibility = () => { if (document.hidden) this.stop(); else this.wake(); };
+     document.addEventListener('visibilitychange', this.onVisibility);
+   }
+ 
+-  readScroll() {
+-    const max = document.documentElement.scrollHeight - innerHeight;
+-    this.target = max > 4 ? clamp(scrollY / max, 0, 1) : 0;
++  /**
++   * Tie each hop to the scroll offset where its section is centred, so the
++   * camera and the copy cannot drift apart no matter how tall a section grows.
++   * Hops without a section of their own are spread evenly between the ones
++   * that have one.
++   */
++  measureStations() {
++    const n = HOPS.length;
++    const at = new Array(n).fill(null);
++
++    HOPS.forEach((hop, i) => {
++      if (!hop.section) return;
++      const element = document.querySelector(hop.section);
++      if (!element) return;
++      const box = element.getBoundingClientRect();
++      at[i] = box.top + scrollY + box.height / 2 - innerHeight / 2;
++    });
++
++    const maxScroll = Math.max(1, document.documentElement.scrollHeight - innerHeight);
++    if (at[0] === null) at[0] = 0;
++    if (at[n - 1] === null) at[n - 1] = maxScroll;
++
++    let known = 0;
++    for (let i = 1; i < n; i++) {
++      if (at[i] === null) continue;
++      const span = i - known;
++      for (let k = 1; k < span; k++) {
++        at[known + k] = at[known] + ((at[i] - at[known]) * k) / span;
++      }
++      known = i;
++    }
++
++    // Monotonic, so a short section can never send the camera backwards.
++    for (let i = 1; i < n; i++) at[i] = Math.max(at[i], at[i - 1] + 1);
++    this.stations = at;
++  }
++
++  /** Where the camera wants to be for the current scroll position. */
++  readRoute() {
++    const at = this.stations;
++    if (!at.length) return;
++    const y = scrollY;
++    const last = at.length - 1;
++
++    if (y <= at[0]) { this.targetZ = hopZ(0) + CAMERA_LEAD; return; }
++    if (y >= at[last]) { this.targetZ = hopZ(last) + CAMERA_LEAD; return; }
++
++    let i = 0;
++    while (i < last - 1 && y > at[i + 1]) i++;
++    const t = clamp((y - at[i]) / Math.max(1, at[i + 1] - at[i]), 0, 1);
++    this.targetZ = mix(hopZ(i), hopZ(i + 1), t) + CAMERA_LEAD;
+   }
+ 
+   resize() {
+     const width = innerWidth;
+     const height = innerHeight;
++    this.wide = width >= 1000;
+     this.camera.aspect = width / height;
+     this.camera.updateProjectionMatrix();
+     this.renderer.setPixelRatio(Math.min(devicePixelRatio || 1, this.tier.dpr));
+     this.renderer.setSize(width, height, false);
+-
+-    // Where a beat's subject sits relative to the copy. On a wide screen the
+-    // layout is two columns, so the subject moves right and the hero copy owns
+-    // the left. Once the grid stacks, moving it sideways would put it straight
+-    // behind the headline — so it moves up into the stage area instead.
+-    const wide = width >= 1000;
+-    this.frameX = wide ? 1 : 0;
+-    this.frameY = wide ? 0 : 0.5;
++    this.measureStations();
++    this.readRoute();
++
++    if (this.anchors.items.length) {
++      this.placeAnchors();
++      const on = this.wide;
++      if (on !== this.anchors.enabled) {
++        this.anchors.enabled = on;
++        if (!on) this.anchors.release();
++        document.body.classList.toggle('anchors-on', on);
++      }
++    }
+   }
+ 
+   /* ----------------------------------------------------------------------
+@@ -237,8 +332,7 @@ export class World {
+     this.last = performance.now();
+     this.tick = (now) => {
+       if (!this.running) return;
+-      const keepGoing = this.frame(now);
+-      if (keepGoing) this.raf = requestAnimationFrame(this.tick);
++      if (this.frame(now)) this.raf = requestAnimationFrame(this.tick);
+       else { this.running = false; this.raf = 0; }
+     };
+     this.raf = requestAnimationFrame(this.tick);
+@@ -250,126 +344,60 @@ export class World {
+     this.raf = 0;
+   }
+ 
+-  /** Returns whether there is still something to animate. */
+   frame(now) {
+     const dt = clamp((now - this.last) / 1000, 0, 0.05);
+     this.last = now;
++    this.time += dt;
++
++    // The dolly: scroll sets a target, the camera eases toward it. That lag is
++    // the difference between a scroll effect and a camera move.
++    const damp = 1 - Math.pow(0.0025, dt);
++    this.z += (this.targetZ - this.z) * damp;
++    const settling = Math.abs(this.targetZ - this.z) > 0.0008;
++    if (!settling) this.z = this.targetZ;
++
++    const ease = 1 - Math.pow(0.02, dt);
++    this.pointer.x += (this.aim.x - this.pointer.x) * ease;
++    this.pointer.y += (this.aim.y - this.pointer.y) * ease;
++
++    const z = this.z;
++
++    // A slow lateral drift so the corridor is travelled rather than stared down.
++    // Tied to depth, so it swings once per hop however long that hop's section is.
++    const sway = Math.sin((CAMERA_LEAD - z) / SPACING * Math.PI * 0.5) * 0.55;
++
++    // Formations sit to one side so they do not land on top of the copy pinned
++    // to the other. Once the copy un-anchors and stacks in normal flow there is
++    // nothing to make room for, and that same offset would push the formation
++    // clean off a narrow screen — so the camera tracks it across instead.
++    const where = clamp((CAMERA_LEAD - z) / SPACING, 0, HOPS.length - 1);
++    const a = Math.floor(where);
++    const b = Math.min(HOPS.length - 1, a + 1);
++    const track = this.wide ? 0 : mix(formationShift(a), formationShift(b), where - a);
++
++    // And on a narrow screen the copy occupies the lower half, so the camera
++    // drops to lift the formation into the space above it.
++    const lift = this.wide ? 0 : -0.6;
+ 
+-    // The dolly: scroll sets a target, the camera eases toward it.
+-    const damp = 1 - Math.pow(0.0022, dt);
+-    this.progress += (this.target - this.progress) * damp;
+-    const settling = Math.abs(this.target - this.progress) > 0.00008;
+-    if (!settling) this.progress = this.target;
+-
+-    this.pointer.x += (this.aim.x - this.pointer.x) * (1 - Math.pow(0.02, dt));
+-    this.pointer.y += (this.aim.y - this.pointer.y) * (1 - Math.pow(0.02, dt));
+-
+-    const last = BEATS.length - 1;
+-    const p = this.progress * last;
+-    const index = clamp(Math.floor(p), 0, last - 1);
+-    const t = smooth(clamp(p - index, 0, 1));
+-    const a = BEATS[index];
+-    const b = BEATS[index + 1];
+-
+-    // Set edge opacity first: writeEdges skips the buffer entirely when the
+-    // edges are invisible, and it should be reading this frame's value.
+-    this.edges.material.opacity = mix(a.edges, b.edges, t);
+-
+-    // Only rewrite buffers when the morph has actually moved.
+-    const key = index + t;
+-    if (key !== this.morphKey) {
+-      this.morphKey = key;
+-      this.writeNodes(index, t, a, b);
+-      this.writeEdges();
+-    }
+-
+-    const spinRate = mix(a.spin, b.spin, t);
+-    this.spin += spinRate * dt;
+-    this.root.rotation.y = this.spin + this.pointer.x * 0.16;
+-    this.root.rotation.x = Math.sin(this.spin * 0.6) * 0.05 - this.pointer.y * 0.08;
+-    const framing = mix(a.framing, b.framing, t);
+-    this.root.position.x = framing * this.frameX;
+-    this.root.position.y = framing * this.frameY;
+-
+-    this.camera.fov = mix(a.camera.fov, b.camera.fov, t);
+-    this.camera.updateProjectionMatrix();
+     this.camera.position.set(
+-      mix(a.camera.pos[0], b.camera.pos[0], t) + this.pointer.x * 0.22,
+-      mix(a.camera.pos[1], b.camera.pos[1], t) - this.pointer.y * 0.16,
+-      mix(a.camera.pos[2], b.camera.pos[2], t),
+-    );
+-    this.lookAt.set(
+-      mix(a.camera.look[0], b.camera.look[0], t),
+-      mix(a.camera.look[1], b.camera.look[1], t),
+-      mix(a.camera.look[2], b.camera.look[2], t),
++      track + sway * (this.wide ? 1 : 0.3) + this.pointer.x * 0.5,
++      0.18 + lift - this.pointer.y * 0.32,
++      z,
+     );
+-    this.camera.lookAt(this.lookAt);
+-
+-    this.dust.rotation.y = -this.spin * 0.25;
++    this.look.set(track + sway * 0.35, 0.05 + lift, z - 10);
++    this.camera.lookAt(this.look);
+ 
++    this.anchors.update();
+     this.renderer.render(this.scene, this.camera);
+ 
+-    // MEASUREMENT locks off completely, so a parked camera there costs nothing.
+-    const drifting = this.tier.idleSpin
+-      && (spinRate > 0.001 || Math.abs(this.aim.x - this.pointer.x) > 0.002);
++    const drifting = Math.abs(this.aim.x - this.pointer.x) > 0.002
++      || Math.abs(this.aim.y - this.pointer.y) > 0.002;
+     return settling || drifting;
+   }
+ 
+-  /** Lerp every node between the two beats that bracket the current scroll. */
+-  writeNodes(index, t, a, b) {
+-    const from = this.shapes[index];
+-    const to = this.shapes[index + 1];
+-    const matrix = this.nodes.instanceMatrix.array;
+-    const colors = this.nodes.instanceColor.array;
+-    const scale = mix(a.nodeScale, b.nodeScale, t);
+-
+-    const ta = this.tones[index];
+-    const tb = this.tones[index + 1];
+-    const tr = mix(ta.r, tb.r, t);
+-    const tg = mix(ta.g, tb.g, t);
+-    const tbl = mix(ta.b, tb.b, t);
+-
+-    for (let i = 0; i < this.count; i++) {
+-      const p = i * 3;
+-      const m = i * 16;
+-      const s = this.sizes[i] * scale;
+-
+-      // Only the diagonal and the translation are ever non-zero, so the rest of
+-      // the matrix keeps the zeroes it was allocated with.
+-      matrix[m] = s;
+-      matrix[m + 5] = s;
+-      matrix[m + 10] = s;
+-      matrix[m + 12] = mix(from[p], to[p], t);
+-      matrix[m + 13] = mix(from[p + 1], to[p + 1], t);
+-      matrix[m + 14] = mix(from[p + 2], to[p + 2], t);
+-      matrix[m + 15] = 1;
+-
+-      colors[p] = mix(this.accents[p], tr, 0.58);
+-      colors[p + 1] = mix(this.accents[p + 1], tg, 0.58);
+-      colors[p + 2] = mix(this.accents[p + 2], tbl, 0.58);
+-    }
+-
+-    this.nodes.instanceMatrix.needsUpdate = true;
+-    this.nodes.instanceColor.needsUpdate = true;
+-  }
+-
+-  /** Edges follow wherever the nodes currently are, so they stretch through a morph. */
+-  writeEdges() {
+-    if (this.edges.material.opacity < 0.005) return;
+-    const matrix = this.nodes.instanceMatrix.array;
+-    const out = this.edgeAttribute.array;
+-    for (let e = 0; e < this.pairs.length; e++) {
+-      const m = this.pairs[e] * 16;
+-      const o = e * 3;
+-      out[o] = matrix[m + 12];
+-      out[o + 1] = matrix[m + 13];
+-      out[o + 2] = matrix[m + 14];
+-    }
+-    this.edgeAttribute.needsUpdate = true;
+-  }
+-
+   dispose() {
+     this.stop();
++    this.anchors.release();
+     removeEventListener('scroll', this.onScroll);
+     removeEventListener('resize', this.onResize);
+     removeEventListener('pointermove', this.onPointer);
+-- 
+2.43.0
+

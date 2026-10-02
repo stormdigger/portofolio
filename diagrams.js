@@ -117,7 +117,7 @@ function benchmark() {
   `);
 }
 
-/** FaceMeet: a face gate in front of a two-party session. */
+/** Face-login paper: a face gate in front of the meeting. */
 function auth() {
   return svg(`
     <circle class="halo" cx="82" cy="70" r="34"/>
@@ -126,9 +126,9 @@ function auth() {
     <path class="wire" d="M 56 48 V 40 h 10 M 108 48 V 40 h -10 M 56 92 v 8 h 10 M 108 92 v 8 h -10"
           stroke-opacity="0.6"/>
     ${wire('M 112 70 H 158')}
-    ${node(196, 70, 'AUTH · JWT', { w: 84 })}
+    ${node(196, 70, 'LBPH MATCH', { w: 92 })}
     ${wire('M 196 88 V 122', 0.6)}
-    ${node(196, 138, 'VIDEO SESSION', { w: 108 })}
+    ${node(196, 138, 'JOIN MEETING', { w: 108 })}
     <text class="node-label" x="82" y="122" opacity="0.7">FACE</text>
   `);
 }

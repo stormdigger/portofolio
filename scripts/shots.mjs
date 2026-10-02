@@ -17,7 +17,7 @@ const VIEWPORTS = [
   { name: 'small', width: 320, height: 640 },
 ];
 
-const SECTIONS = ['top', 'work', 'journey', 'toolbox', 'proof', 'contact'];
+const SECTIONS = ['top', 'work', 'research', 'journey', 'toolbox', 'proof', 'contact'];
 
 await mkdir(outDir, { recursive: true });
 

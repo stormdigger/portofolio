@@ -1,0 +1,1272 @@
+From 2ab7eb70a62933cd136eea17ea4046b1d2b38b28 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 12 Sep 2026 09:11:22 +0000
+Subject: [PATCH] Rebuild the page as one continuous scroll-driven 3D take
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The hero's contained node network becomes a full-page world: a fixed canvas
+behind the document, with scroll position driving a camera through eight beats
+— a single node in a small room, the question that breaks it apart, the lattice
+it snaps into, the lens it grows, the benchmark it locks off on, the region it
+replicates across, the system that ends up in production, and the pull-out that
+returns it to one light.
+
+There are no cuts. Every beat is the same ~1800 points in a different
+arrangement, so a morph is a lerp between two position sets rather than a scene
+swap, and the node that opens the take is the node that closes it.
+
+- beats.js: the shot list — eight shapes, each with its camera, node scale,
+  edge opacity, drift rate and framing offset.
+- world.js: the rig — tier detection, scroll driver, damped camera, and a
+  render loop that stops once nothing is left to settle.
+
+Notes on the implementation:
+
+- Scroll is never intercepted. The canvas is fixed, takes no pointer events,
+  and the document scrolls over it exactly as before.
+- Three draw calls for the whole world. Instance buffers are only rewritten
+  when the morph advances; MEASUREMENT drifts at zero, so a camera parked
+  there renders nothing.
+- r185's fragment shader only applies vColor under USE_COLOR, so instanceColor
+  alone is silently dropped. An all-white vertex colour attribute on the base
+  geometry turns it on and leaves instanceColor as the only thing tinting a node.
+- Three tiers: full on desktop, reduced geometry and no idle drift on phones,
+  and off entirely for reduced motion or missing WebGL — which restores exactly
+  the previous flat site, static hero SVG included.
+- The journey and proof panels fade in and out rather than starting hard; over
+  a continuous shot a solid panel edge reads as a seam.
+- shots.mjs takes CHROMIUM_PATH so a CI image can point at a browser Playwright
+  did not download itself.
+
+Verified at 1440, 1280, 820, 390 and 320px: no horizontal overflow, no console
+errors, and the world composes clear of the copy at every width.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019ayWFJPobMWqGx13R5GaWP
+---
+ README.md         |  26 +++-
+ app.js            |  48 +++---
+ beats.js          | 272 ++++++++++++++++++++++++++++++++
+ hero3d.js         | 254 ------------------------------
+ index.html        |   6 +-
+ package-lock.json |   8 +-
+ scripts/build.mjs |   2 +-
+ scripts/shots.mjs |   4 +
+ styles.css        |  58 ++++++-
+ world.js          | 385 ++++++++++++++++++++++++++++++++++++++++++++++
+ 10 files changed, 765 insertions(+), 298 deletions(-)
+ create mode 100644 beats.js
+ delete mode 100644 hero3d.js
+ create mode 100644 world.js
+
+diff --git a/README.md b/README.md
+index c6a1713..0b1760d 100644
+--- a/README.md
++++ b/README.md
+@@ -1,7 +1,13 @@
+ # Balwinder Singh — portfolio
+ 
+ A light, warm, fast portfolio. Hero → selected work → journey → toolbox → proof → contact.
+-One 3D moment in the hero; everything else is flat HTML, CSS, and inline SVG.
++
++The page is one continuous 3D shot. Scroll position drives a camera through eight beats,
++from a single node on a desk in a small room to a serverless system a hospital runs on.
++There are no cuts: the same ~1800 points are rearranged from beat to beat, so the node
++that opens the film is the node that ends it. Everything else is flat HTML, CSS, and
++inline SVG, and the whole world is a background layer — remove it and the site is the
++same flat, fast page it has always been.
+ 
+ ## Run locally
+ 
+@@ -33,7 +39,8 @@ npm test          # screenshots + overflow/console check at 5 viewports
+ | `data.js` | Every fact on the site: profile, projects, chapters, toolbox, achievements |
+ | `app.js` | Renders each section, wires the dialog, nav, scroll reveal, and hero mount |
+ | `diagrams.js` | Animated inline-SVG architecture diagrams, one per project |
+-| `hero3d.js` | The hero's rotating node network (Three.js) |
++| `beats.js` | The shot list: eight point arrangements, each with its camera |
++| `world.js` | The rig — fixed canvas, scroll driver, damped camera, render loop |
+ | `styles.css` | The whole design system: tokens, layout, components, responsive rules |
+ | `index.html` | Document shell and section landmarks |
+ | `resume.html` | Standalone printable résumé, works without JavaScript |
+@@ -44,10 +51,17 @@ npm test          # screenshots + overflow/console check at 5 viewports
+ accent colours. Each project and tool card owns one accent, set through a `--tone`
+ custom property, so colour identifies content instead of decorating it.
+ 
+-**The 3D is optional.** `hero3d.js` is dynamically imported, only animates while the
+-hero is on screen (IntersectionObserver), and pauses on tab blur. If WebGL is missing
+-or the visitor prefers reduced motion, the module is never loaded and a static SVG
+-renders instead. Nothing else on the page depends on it.
++**The world is optional.** `world.js` is dynamically imported and never required. It
++picks one of three tiers at load: the full world on desktop, reduced geometry with no
++idle drift on phones, and nothing at all when WebGL is missing or the visitor prefers
++reduced motion — in which case the hero falls back to the same static SVG it always
++used. The page scrolls normally either way; nothing intercepts the wheel, and the
++canvas takes no pointer events.
++
++**It costs three draw calls.** Nodes are one `InstancedMesh`, edges one `LineSegments`,
++dust one `Points`. Instance buffers are only rewritten when the morph actually advances,
++and the render loop stops once nothing is left to settle. `MEASUREMENT` sets its drift
++rate to zero, so a camera parked on that beat renders nothing at all.
+ 
+ **Diagrams over decoration.** Each project card shows the actual request path — the
+ travelling pulse follows the same `flow` array printed in the case study. Motion is
+diff --git a/app.js b/app.js
+index 13acd01..9fc32bc 100644
+--- a/app.js
++++ b/app.js
+@@ -314,39 +314,41 @@ if (motion.matches) {
+ }
+ 
+ /* ==========================================================================
+-   Hero 3D — progressively enhanced, never required
++   The world — progressively enhanced, never required
+    ========================================================================== */
+ 
+-const canvas = $('#hero-canvas');
+-let hero = null;
+-
+-async function mountHero() {
+-  // Reduced motion gets the static SVG; no reason to ship a renderer for it.
+-  if (motion.matches) {
+-    document.body.classList.add('no-webgl');
+-    return;
+-  }
++let world = null;
+ 
++/**
++ * Every beat of the take is a background layer. Remove the canvas — no WebGL,
++ * reduced motion, an old phone — and the page is exactly the flat, fast site it
++ * was before: same content, same order, same fallback diagram in the hero card.
++ */
++async function mountWorld() {
+   try {
+-    const { HeroScene } = await import('./hero3d.js');
+-    hero = new HeroScene(canvas, { reducedMotion: motion.matches });
++    const { World, pickTier } = await import('./world.js');
++    const tier = pickTier(motion.matches);
++
++    if (tier === 'off') {
++      document.body.classList.add('no-webgl');
++      return;
++    }
++
++    world = new World($('#world'), { tier });
++    document.body.classList.add('world-on');
+   } catch (error) {
+-    console.warn('Hero 3D unavailable; using the static diagram.', error);
++    console.warn('The world could not start; falling back to the flat site.', error);
+     document.body.classList.add('no-webgl');
+   }
+ }
+ 
+-mountHero();
+-
+-let resizeTimer;
+-addEventListener('resize', () => {
+-  clearTimeout(resizeTimer);
+-  resizeTimer = setTimeout(() => hero?.resize(), 140);
+-});
++mountWorld();
+ 
++// Reduced motion can be switched on mid-visit; tear the world down when it is.
+ motion.addEventListener('change', () => {
+-  if (!motion.matches) return;
+-  hero?.dispose();
+-  hero = null;
++  if (!motion.matches || !world) return;
++  world.dispose();
++  world = null;
++  document.body.classList.remove('world-on');
+   document.body.classList.add('no-webgl');
+ });
+diff --git a/beats.js b/beats.js
+new file mode 100644
+index 0000000..206269c
+--- /dev/null
++++ b/beats.js
+@@ -0,0 +1,272 @@
++/**
++ * The eight beats of the single continuous take.
++ *
++ * Every beat describes the same ~1800 points in a different arrangement. Nothing
++ * is ever added or removed between beats — the take has no cuts, so the node that
++ * opens the film as one curious question is the same node that ends up as a
++ * Lambda function. Morphing is a linear interpolation between two of these
++ * position sets, which is why the whole thing costs one pass over a Float32Array.
++ *
++ * Each beat also carries its camera. `pos` and `look` are world units, `fov` is
++ * vertical degrees. `spin` is the drift rate of the world in radians per second —
++ * MEASUREMENT sets it to zero, because that is the one shot where the camera locks
++ * off and the film stops being pretty and starts being rigorous.
++ *
++ * `framing` shifts the subject right of centre on wide screens so the hero copy
++ * has the left half of the frame to itself. On narrow screens it is ignored.
++ */
++
++/** The site's six accent hues, so the world is coloured by the same palette as the page. */
++export const PALETTE = [0xf2604a, 0xf2a03d, 0x3fa87b, 0x3f8fd4, 0x7b62d9, 0xe0577f];
++
++export const TIERS = {
++  full: { nodes: 1800, dust: 900, dpr: 2, idleSpin: true },
++  lite: { nodes: 620, dust: 260, dpr: 1.5, idleSpin: false },
++};
++
++/** Deterministic PRNG — the world should frame identically on every load. */
++function makeRandom(seed) {
++  let s = seed >>> 0;
++  return () => {
++    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
++    return s / 4294967296;
++  };
++}
++
++const GOLDEN = Math.PI * (3 - Math.sqrt(5));
++
++/** Even points on a sphere. The even spread is what reads as a network, not a blob. */
++function fibonacci(out, o, i, count, radius) {
++  const y = count === 1 ? 0 : 1 - (i / (count - 1)) * 2;
++  const r = Math.sqrt(Math.max(0, 1 - y * y));
++  const theta = GOLDEN * i;
++  out[o] = Math.cos(theta) * r * radius;
++  out[o + 1] = y * radius;
++  out[o + 2] = Math.sin(theta) * r * radius;
++}
++
++/* ==========================================================================
++   Shapes — one per beat
++   ========================================================================== */
++
++/** 00 · A single node on a desk. Tight enough that the cluster reads as one object. */
++function room(n) {
++  const a = new Float32Array(n * 3);
++  const rnd = makeRandom(1101);
++  for (let i = 0; i < n; i++) {
++    fibonacci(a, i * 3, i, n, 0.26 + rnd() * 0.1);
++  }
++  return a;
++}
++
++/** 01 · It comes apart. Taking things apart and putting them back, staged literally. */
++function question(n) {
++  const a = new Float32Array(n * 3);
++  const rnd = makeRandom(2202);
++  for (let i = 0; i < n; i++) {
++    const o = i * 3;
++    fibonacci(a, o, i, n, 2.1 + rnd() * 1.2);
++    // Fragments, not a smooth shell: push clusters of indices out together.
++    const shard = 1 + Math.sin(i * 0.7) * 0.22;
++    a[o] *= shard; a[o + 1] *= shard; a[o + 2] *= shard;
++  }
++  return a;
++}
++
++/** 02 · Guessing becomes reasoning. Fragments lock into an ordered lattice. */
++function structure(n) {
++  const a = new Float32Array(n * 3);
++  const side = Math.max(2, Math.round(Math.cbrt(n)));
++  const span = 3.1;
++  for (let i = 0; i < n; i++) {
++    const o = i * 3;
++    const x = i % side;
++    const y = Math.floor(i / side) % side;
++    const z = Math.floor(i / (side * side)) % side;
++    a[o] = (x / (side - 1) - 0.5) * span;
++    a[o + 1] = (y / (side - 1) - 0.5) * span;
++    a[o + 2] = (z / (side - 1) - 0.5) * span;
++  }
++  return a;
++}
++
++/** 03 · The lattice curves into a lens, and a waveform runs through it. */
++function sight(n) {
++  const a = new Float32Array(n * 3);
++  const rnd = makeRandom(3303);
++  for (let i = 0; i < n; i++) {
++    const o = i * 3;
++    const u = n === 1 ? 0 : i / (n - 1);
++    if (i % 5 === 0) {
++      // The voice: a wave crossing the frame, loudest in the middle.
++      const t = u * 2 - 1;
++      a[o] = t * 3.4;
++      a[o + 1] = Math.sin(t * 8.5) * 0.62 * (1 - Math.abs(t) * 0.55);
++      a[o + 2] = (rnd() - 0.5) * 0.12;
++    } else {
++      // The eye: concentric rings bowed toward the camera.
++      const ring = 0.45 + (i % 4) * 0.34;
++      const ang = u * Math.PI * 2 * 11 + ring;
++      a[o] = Math.cos(ang) * ring;
++      a[o + 1] = Math.sin(ang) * ring;
++      a[o + 2] = 0.9 - ring * ring * 0.85;
++    }
++  }
++  return a;
++}
++
++/** 04 · YOLOv8, Faster R-CNN, SSD — measured against each other. */
++function measurement(n) {
++  const a = new Float32Array(n * 3);
++  const rnd = makeRandom(4404);
++  const heights = [2.15, 1.52, 1.0];
++  for (let i = 0; i < n; i++) {
++    const o = i * 3;
++    const col = i % 3;
++    const k = Math.floor(i / 3) / Math.max(1, Math.floor(n / 3));
++    a[o] = (col - 1) * 1.45 + (rnd() - 0.5) * 0.5;
++    a[o + 1] = k * heights[col] - 1.15;
++    a[o + 2] = (rnd() - 0.5) * 0.5;
++  }
++  return a;
++}
++
++/** 05 · One machine becomes a region. The cluster replicates across a plane. */
++function deploy(n) {
++  const a = new Float32Array(n * 3);
++  const rnd = makeRandom(5505);
++  const cells = 5;
++  const per = Math.max(1, Math.floor(n / (cells * cells)));
++  for (let i = 0; i < n; i++) {
++    const o = i * 3;
++    const cell = Math.min(cells * cells - 1, Math.floor(i / per));
++    const cx = (cell % cells) - (cells - 1) / 2;
++    const cz = Math.floor(cell / cells) - (cells - 1) / 2;
++    a[o] = cx * 1.7 + (rnd() - 0.5) * 0.72;
++    a[o + 1] = (rnd() - 0.5) * 0.5;
++    a[o + 2] = cz * 1.7 + (rnd() - 0.5) * 0.72;
++  }
++  return a;
++}
++
++/** 06 · The full distributed system. The scene the site used to open with, arriving as the destination. */
++function production(n) {
++  const a = new Float32Array(n * 3);
++  const rnd = makeRandom(6606);
++  for (let i = 0; i < n; i++) {
++    const o = i * 3;
++    fibonacci(a, o, i, n, 3.4);
++    const j = 0.22;
++    a[o] += (rnd() - 0.5) * j;
++    a[o + 1] += (rnd() - 0.5) * j;
++    a[o + 2] += (rnd() - 0.5) * j;
++  }
++  return a;
++}
++
++/** 07 · Back to one warm light, with the whole journey behind it. */
++function pullOut(n) {
++  const a = new Float32Array(n * 3);
++  const rnd = makeRandom(7707);
++  for (let i = 0; i < n; i++) {
++    fibonacci(a, i * 3, i, n, 0.22 + rnd() * 0.08);
++  }
++  return a;
++}
++
++/* ==========================================================================
++   The shot list
++   ========================================================================== */
++
++export const BEATS = [
++  {
++    id: 'room', slug: 'INT. SMALL ROOM', tone: 0xf2604a, shape: room,
++    camera: { pos: [0, 0.05, 4.6], look: [0, 0, 0], fov: 34 },
++    nodeScale: 0.5, edges: 0, spin: 0.05, framing: 0.97,
++  },
++  {
++    id: 'question', slug: 'THE QUESTION', tone: 0xf2604a, shape: question,
++    camera: { pos: [0, 0.2, 11.5], look: [0, 0, 0], fov: 40 },
++    nodeScale: 0.85, edges: 0.04, spin: 0.06, framing: 0.5,
++  },
++  {
++    id: 'structure', slug: 'STRUCTURE', tone: 0xf2a03d, shape: structure,
++    camera: { pos: [3.0, 2.2, 6.4], look: [0, 0, 0], fov: 38 },
++    nodeScale: 0.8, edges: 0, spin: 0.05, framing: 0,
++  },
++  {
++    id: 'sight', slug: 'SIGHT & SOUND', tone: 0x3fa87b, shape: sight,
++    camera: { pos: [0, 0, 3.0], look: [0, 0, -0.2], fov: 52 },
++    nodeScale: 0.4, edges: 0, spin: 0.03, framing: 0,
++  },
++  {
++    id: 'measurement', slug: 'MEASUREMENT', tone: 0x3f8fd4, shape: measurement,
++    camera: { pos: [0, 0.3, 7.6], look: [0, 0.1, 0], fov: 26 },
++    nodeScale: 0.55, edges: 0, spin: 0, framing: 0,
++  },
++  {
++    id: 'deploy', slug: 'DEPLOY', tone: 0x7b62d9, shape: deploy,
++    camera: { pos: [0, 5.0, 8.4], look: [0, -0.5, 0], fov: 44 },
++    nodeScale: 0.75, edges: 0.09, spin: 0.04, framing: 0,
++  },
++  {
++    id: 'production', slug: 'PRODUCTION', tone: 0xe0577f, shape: production,
++    camera: { pos: [0, 0.7, 11.0], look: [0, 0, 0], fov: 38 },
++    nodeScale: 1.55, edges: 0.34, spin: 0.08, framing: 0,
++  },
++  {
++    id: 'pullout', slug: 'PULL OUT', tone: 0xf2a03d, shape: pullOut,
++    camera: { pos: [0, 0, 19.0], look: [0, 0, 0], fov: 30 },
++    nodeScale: 1.2, edges: 0.16, spin: 0.05, framing: 0,
++  },
++];
++
++/** Build every beat's position set once, up front. */
++export function buildShapes(count) {
++  return BEATS.map((beat) => beat.shape(count));
++}
++
++/**
++ * Edge pairs, derived from PRODUCTION — the one arrangement where "nearest
++ * neighbour" means something. Edges fade to nothing through the early beats
++ * rather than being rebuilt, so the take never cuts; they only come up once the
++ * world has become a system again.
++ */
++export function buildEdges(positions, perNode = 2) {
++  const count = positions.length / 3;
++  const seen = new Set();
++  const pairs = [];
++  // A coarse spatial hash keeps this linear enough to run at load without a hitch.
++  const near = [];
++
++  for (let i = 0; i < count; i++) {
++    const ax = positions[i * 3];
++    const ay = positions[i * 3 + 1];
++    const az = positions[i * 3 + 2];
++    near.length = 0;
++
++    for (let j = 0; j < count; j++) {
++      if (j === i) continue;
++      const dx = positions[j * 3] - ax;
++      const dy = positions[j * 3 + 1] - ay;
++      const dz = positions[j * 3 + 2] - az;
++      const d = dx * dx + dy * dy + dz * dz;
++      if (near.length < perNode) {
++        near.push({ j, d });
++        near.sort((p, q) => p.d - q.d);
++      } else if (d < near[near.length - 1].d) {
++        near[near.length - 1] = { j, d };
++        near.sort((p, q) => p.d - q.d);
++      }
++    }
++
++    for (const { j } of near) {
++      const key = i < j ? `${i}:${j}` : `${j}:${i}`;
++      if (seen.has(key)) continue;
++      seen.add(key);
++      pairs.push(i, j);
++    }
++  }
++
++  return Uint32Array.from(pairs);
++}
+diff --git a/hero3d.js b/hero3d.js
+deleted file mode 100644
+index 1698a8d..0000000
+--- a/hero3d.js
++++ /dev/null
+@@ -1,254 +0,0 @@
+-import * as THREE from './assets/vendor/three.module.js';
+-
+-/**
+- * The single 3D moment on the page: a slowly rotating node network that stands
+- * for a distributed system. Deliberately small in scope — it lives inside the
+- * hero card, never takes over the viewport, and never hijacks scrolling.
+- *
+- * Design notes
+- * - Lit for a light background: bright ambient, warm key, soft coral/amber
+- *   materials matching the page palette. No fog, no bloom, no dark void.
+- * - Renders only while the hero is on screen (IntersectionObserver) and pauses
+- *   on tab blur, so it costs nothing once the visitor scrolls to the work.
+- * - Fails soft: the constructor throws if WebGL is unavailable and the caller
+- *   swaps in a static SVG.
+- */
+-
+-const PALETTE = [0xf2604a, 0xf2a03d, 0x3fa87b, 0x3f8fd4, 0x7b62d9, 0xe0577f];
+-
+-export class HeroScene {
+-  constructor(canvas, { reducedMotion = false } = {}) {
+-    this.canvas = canvas;
+-    this.reduced = reducedMotion;
+-    this.running = false;
+-    this.pointer = { x: 0, y: 0 };
+-    this.target = { x: 0, y: 0 };
+-
+-    this.renderer = new THREE.WebGLRenderer({
+-      canvas,
+-      antialias: true,
+-      alpha: true,
+-      powerPreference: 'low-power',
+-    });
+-    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+-    this.renderer.toneMappingExposure = 1.05;
+-
+-    this.scene = new THREE.Scene();
+-    this.camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+-    this.camera.position.set(0, 0.3, 15.5);
+-
+-    // Lighting tuned for a pale background: no deep shadows.
+-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0xf1e5d8, 2.1));
+-
+-    const key = new THREE.DirectionalLight(0xfff4e6, 2.4);
+-    key.position.set(4, 6, 8);
+-    this.scene.add(key);
+-
+-    const fill = new THREE.DirectionalLight(0xdce9f7, 1.1);
+-    fill.position.set(-6, -2, 4);
+-    this.scene.add(fill);
+-
+-    this.root = new THREE.Group();
+-    this.scene.add(this.root);
+-
+-    this.buildNetwork();
+-    this.resize();
+-    this.bind();
+-  }
+-
+-  /**
+-   * Nodes on a Fibonacci sphere, connected to their nearest neighbours. The
+-   * even distribution is what makes it read as a network rather than a blob.
+-   */
+-  buildNetwork() {
+-    const COUNT = 26;
+-    const RADIUS = 3.5;
+-    const golden = Math.PI * (3 - Math.sqrt(5));
+-
+-    this.nodes = [];
+-    const positions = [];
+-
+-    for (let i = 0; i < COUNT; i++) {
+-      const y = 1 - (i / (COUNT - 1)) * 2;
+-      const r = Math.sqrt(Math.max(0, 1 - y * y));
+-      const theta = golden * i;
+-      positions.push(new THREE.Vector3(
+-        Math.cos(theta) * r * RADIUS,
+-        y * RADIUS,
+-        Math.sin(theta) * r * RADIUS,
+-      ));
+-    }
+-
+-    const sphere = new THREE.IcosahedronGeometry(0.2, 1);
+-
+-    positions.forEach((position, i) => {
+-      const color = PALETTE[i % PALETTE.length];
+-      const mesh = new THREE.Mesh(sphere, new THREE.MeshStandardMaterial({
+-        color,
+-        roughness: 0.34,
+-        metalness: 0.1,
+-        emissive: color,
+-        emissiveIntensity: 0.16,
+-      }));
+-      mesh.position.copy(position);
+-      // Vary the size a little so the network has a visual hierarchy.
+-      mesh.scale.setScalar(0.7 + ((i * 37) % 10) / 14);
+-      mesh.userData.phase = (i * 1.7) % (Math.PI * 2);
+-      mesh.userData.home = position.clone();
+-      this.root.add(mesh);
+-      this.nodes.push(mesh);
+-    });
+-
+-    // Connect each node to the two nearest others, de-duplicated.
+-    const seen = new Set();
+-    const segments = [];
+-
+-    positions.forEach((a, i) => {
+-      const near = positions
+-        .map((b, j) => ({ j, d: a.distanceTo(b) }))
+-        .filter((entry) => entry.j !== i)
+-        .sort((x, y) => x.d - y.d)
+-        .slice(0, 2);
+-
+-      for (const { j } of near) {
+-        const pairKey = i < j ? `${i}:${j}` : `${j}:${i}`;
+-        if (seen.has(pairKey)) continue;
+-        seen.add(pairKey);
+-        segments.push(a, positions[j]);
+-      }
+-    });
+-
+-    this.links = new THREE.LineSegments(
+-      new THREE.BufferGeometry().setFromPoints(segments),
+-      new THREE.LineBasicMaterial({ color: 0xc9ae95, transparent: true, opacity: 0.5 }),
+-    );
+-    this.root.add(this.links);
+-
+-    // A faint shell to give the cluster a silhouette.
+-    this.shell = new THREE.Mesh(
+-      new THREE.IcosahedronGeometry(RADIUS + 0.55, 1),
+-      new THREE.MeshBasicMaterial({
+-        color: 0xf2a03d, wireframe: true, transparent: true, opacity: 0.14,
+-      }),
+-    );
+-    this.root.add(this.shell);
+-  }
+-
+-  bind() {
+-    this.onPointer = (event) => {
+-      if (this.reduced) return;
+-      const rect = this.canvas.getBoundingClientRect();
+-      this.target.x = ((event.clientX - rect.left) / rect.width - 0.5) * 2;
+-      this.target.y = ((event.clientY - rect.top) / rect.height - 0.5) * 2;
+-    };
+-    this.onLeave = () => { this.target.x = 0; this.target.y = 0; };
+-
+-    this.canvas.addEventListener('pointermove', this.onPointer, { passive: true });
+-    this.canvas.addEventListener('pointerleave', this.onLeave, { passive: true });
+-
+-    this.onVisibility = () => {
+-      if (document.hidden) this.stop();
+-      else if (this.visible) this.start();
+-    };
+-    document.addEventListener('visibilitychange', this.onVisibility);
+-
+-    // The card is fluid, so track its box rather than the window's.
+-    if ('ResizeObserver' in window) {
+-      this.resizeObserver = new ResizeObserver(() => this.resize());
+-      this.resizeObserver.observe(this.canvas);
+-    }
+-
+-    // Only animate while the hero is actually on screen.
+-    this.observer = new IntersectionObserver(([entry]) => {
+-      this.visible = entry.isIntersecting;
+-      if (entry.isIntersecting && !document.hidden) this.start();
+-      else this.stop();
+-    }, { threshold: 0.05 });
+-    this.observer.observe(this.canvas);
+-  }
+-
+-  resize() {
+-    const rect = this.canvas.getBoundingClientRect();
+-    const width = Math.max(1, rect.width);
+-    const height = Math.max(1, rect.height);
+-    const aspect = width / height;
+-
+-    this.camera.aspect = aspect;
+-
+-    // Frame the whole cluster whatever the card's shape: solve the distance
+-    // that fits SPAN vertically, and again horizontally, and take the larger.
+-    const SPAN = 4.6;
+-    const vFov = (this.camera.fov * Math.PI) / 180;
+-    const distV = SPAN / Math.tan(vFov / 2);
+-    const distH = SPAN / (Math.tan(vFov / 2) * aspect);
+-    this.camera.position.z = Math.max(distV, distH);
+-
+-    this.camera.updateProjectionMatrix();
+-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+-    this.renderer.setSize(width, height, false);
+-    this.renderOnce();
+-  }
+-
+-  start() {
+-    if (this.running || this.reduced) {
+-      // Reduced motion still deserves one correct frame.
+-      if (this.reduced) this.renderOnce();
+-      return;
+-    }
+-    this.running = true;
+-    this.clock ??= new THREE.Clock();
+-    this.clock.getDelta();
+-    this.loop = (time) => {
+-      if (!this.running) return;
+-      this.frame(time * 0.001);
+-      this.raf = requestAnimationFrame(this.loop);
+-    };
+-    this.raf = requestAnimationFrame(this.loop);
+-  }
+-
+-  stop() {
+-    this.running = false;
+-    if (this.raf) cancelAnimationFrame(this.raf);
+-    this.raf = 0;
+-  }
+-
+-  renderOnce() {
+-    this.frame(0);
+-  }
+-
+-  frame(t) {
+-    // Ease toward the pointer so the parallax never snaps.
+-    this.pointer.x += (this.target.x - this.pointer.x) * 0.06;
+-    this.pointer.y += (this.target.y - this.pointer.y) * 0.06;
+-
+-    this.root.rotation.y = t * 0.16 + this.pointer.x * 0.42;
+-    this.root.rotation.x = Math.sin(t * 0.22) * 0.12 - this.pointer.y * 0.3;
+-    this.shell.rotation.y = -t * 0.09;
+-
+-    // Nodes breathe gently along their own radius.
+-    for (const node of this.nodes) {
+-      const home = node.userData.home;
+-      const pulse = 1 + Math.sin(t * 1.1 + node.userData.phase) * 0.045;
+-      node.position.copy(home).multiplyScalar(pulse);
+-    }
+-
+-    this.renderer.render(this.scene, this.camera);
+-  }
+-
+-  dispose() {
+-    this.stop();
+-    this.observer?.disconnect();
+-    this.resizeObserver?.disconnect();
+-    document.removeEventListener('visibilitychange', this.onVisibility);
+-    this.canvas.removeEventListener('pointermove', this.onPointer);
+-    this.canvas.removeEventListener('pointerleave', this.onLeave);
+-    this.scene.traverse((object) => {
+-      object.geometry?.dispose();
+-      const material = object.material;
+-      if (Array.isArray(material)) material.forEach((m) => m.dispose());
+-      else material?.dispose();
+-    });
+-    this.renderer.dispose();
+-  }
+-}
+diff --git a/index.html b/index.html
+index 7c95b2e..644d329 100644
+--- a/index.html
++++ b/index.html
+@@ -18,6 +18,9 @@
+   <link rel="stylesheet" href="styles.css">
+ </head>
+ <body>
++  <!-- The continuous shot. Fixed behind the document; the page scrolls normally. -->
++  <canvas id="world" aria-hidden="true"></canvas>
++
+   <a class="skip-link" href="#work">Skip to work</a>
+ 
+   <header class="site-header" id="site-header">
+@@ -51,7 +54,7 @@
+   </header>
+ 
+   <main id="top">
+-    <!-- Hero: the one 3D moment on the page. -->
++    <!-- Shot 00 of the take: tight on a single node, before anything else exists. -->
+     <section class="hero">
+       <div class="wrap hero-grid">
+         <div class="hero-copy">
+@@ -75,7 +78,6 @@
+         </div>
+ 
+         <div class="hero-stage">
+-          <canvas id="hero-canvas" aria-hidden="true"></canvas>
+           <div class="hero-fallback" id="hero-fallback" aria-hidden="true"></div>
+           <p class="stage-badge">
+             <span id="stage-label">arovita-hms · aws</span>
+diff --git a/package-lock.json b/package-lock.json
+index 7ae4884..460d32c 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1,12 +1,12 @@
+ {
+-  "name": "the-curiosity-of-balwinder",
+-  "version": "1.0.0",
++  "name": "balwinder-singh-portfolio",
++  "version": "2.0.0",
+   "lockfileVersion": 3,
+   "requires": true,
+   "packages": {
+     "": {
+-      "name": "the-curiosity-of-balwinder",
+-      "version": "1.0.0",
++      "name": "balwinder-singh-portfolio",
++      "version": "2.0.0",
+       "dependencies": {
+         "three": "^0.185.1"
+       },
+diff --git a/scripts/build.mjs b/scripts/build.mjs
+index cea5ad3..a69e7eb 100644
+--- a/scripts/build.mjs
++++ b/scripts/build.mjs
+@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
+ const root = fileURLToPath(new URL('..', import.meta.url));
+ const output = resolve(root, 'dist');
+ 
+-const MODULES = ['app.js', 'data.js', 'diagrams.js', 'hero3d.js'];
++const MODULES = ['app.js', 'beats.js', 'data.js', 'diagrams.js', 'world.js'];
+ const FILES = [...MODULES, 'index.html', 'styles.css', 'resume.html'];
+ 
+ for (const name of MODULES) {
+diff --git a/scripts/shots.mjs b/scripts/shots.mjs
+index be2d46e..27d7901 100644
+--- a/scripts/shots.mjs
++++ b/scripts/shots.mjs
+@@ -21,7 +21,11 @@ const SECTIONS = ['top', 'work', 'journey', 'toolbox', 'proof', 'contact'];
+ 
+ await mkdir(outDir, { recursive: true });
+ 
++// swiftshader gives the headless run a real WebGL context, so the world is
++// actually exercised rather than silently falling back to the flat site.
++// CHROMIUM_PATH lets a CI image point at a browser Playwright did not download.
+ const browser = await chromium.launch({
++  executablePath: process.env.CHROMIUM_PATH || undefined,
+   args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'],
+ });
+ 
+diff --git a/styles.css b/styles.css
+index 06f1505..b7c41a2 100644
+--- a/styles.css
++++ b/styles.css
+@@ -498,13 +498,6 @@ img, svg, canvas { max-width: 100%; display: block; }
+   box-shadow: var(--shadow-lg);
+ }
+ 
+-#hero-canvas {
+-  position: absolute;
+-  inset: 0;
+-  width: 100%;
+-  height: 100%;
+-}
+-
+ /* Static SVG shown when WebGL is unavailable or motion is reduced. */
+ .hero-fallback {
+   position: absolute;
+@@ -515,7 +508,56 @@ img, svg, canvas { max-width: 100%; display: block; }
+ }
+ 
+ .no-webgl .hero-fallback { display: grid; }
+-.no-webgl #hero-canvas { display: none; }
++
++/* ==========================================================================
++   The world — one fixed canvas behind the whole document
++
++   The page scrolls over it normally: no wheel handler, no scroll-jacking, and
++   no pointer events on the canvas itself. With `.world-on` absent, every rule
++   here is inert and the site is exactly the flat version it has always been.
++   ========================================================================== */
++
++#world {
++  position: fixed;
++  inset: 0;
++  z-index: 0;
++  display: block;
++  width: 100%;
++  height: 100%;
++  pointer-events: none;
++}
++
++/* Content rides above the canvas. The header already sits at z-index 100. */
++.world-on main,
++.world-on .site-footer {
++  position: relative;
++  z-index: 1;
++}
++
++/* Let the world through where the page used to paint solid panels. */
++.world-on .hero::before { opacity: 0.5; }
++
++.world-on .hero-stage {
++  background: none;
++  border-color: transparent;
++  box-shadow: none;
++}
++
++.world-on .strip { background: #f7efe6cc; }
++
++/* These two sections used to paint a solid panel. Over a continuous shot a solid
++   edge reads as a seam — the world is vivid on one side of it and washed on the
++   other — so the veil fades in and out instead of starting hard. */
++.world-on .journey,
++.world-on .proof {
++  background: linear-gradient(
++    to bottom,
++    #f7efe600 0%,
++    #f7efe6de 9%,
++    #f7efe6de 91%,
++    #f7efe600 100%
++  );
++}
+ 
+ .stage-badge {
+   position: absolute;
+diff --git a/world.js b/world.js
+new file mode 100644
+index 0000000..e0568c7
+--- /dev/null
++++ b/world.js
+@@ -0,0 +1,385 @@
++import * as THREE from './assets/vendor/three.module.js';
++import { BEATS, PALETTE, TIERS, buildShapes, buildEdges } from './beats.js';
++
++/**
++ * The rig: one continuous shot through the whole page.
++ *
++ * A fixed, full-viewport canvas sits behind the document. The page scrolls
++ * normally — nothing is intercepted, no wheel handler, no scroll-jacking — and
++ * scroll position drives a camera that eases toward its target rather than
++ * snapping to it. That lag is the whole difference between a scroll effect and
++ * a camera move.
++ *
++ * Cost control
++ * - Three draw calls for the entire world: nodes, edges, dust.
++ * - Instance positions are only rewritten when the morph actually advances.
++ * - The loop stops when nothing is left to settle (and on tab blur). The `full`
++ *   tier keeps a slow idle drift so the world stays alive; `lite` freezes, which
++ *   is what keeps a phone cool on a long scroll.
++ */
++
++const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
++const smooth = (t) => t * t * (3 - 2 * t);
++const mix = (a, b, t) => a + (b - a) * t;
++
++/** Which version of the world this visitor gets, decided once at load. */
++export function pickTier(reducedMotion) {
++  if (reducedMotion) return 'off';
++
++  try {
++    const probe = document.createElement('canvas');
++    if (!(probe.getContext('webgl2') || probe.getContext('webgl'))) return 'off';
++  } catch {
++    return 'off';
++  }
++
++  const small = matchMedia('(max-width: 900px)').matches;
++  const touch = navigator.maxTouchPoints > 1;
++  const cores = navigator.hardwareConcurrency || 4;
++  return small || touch || cores <= 4 ? 'lite' : 'full';
++}
++
++export class World {
++  constructor(canvas, { tier = 'full' } = {}) {
++    this.canvas = canvas;
++    this.tier = TIERS[tier] ?? TIERS.full;
++    this.count = this.tier.nodes;
++
++    this.progress = 0;
++    this.target = 0;
++    this.spin = 0;
++    this.pointer = { x: 0, y: 0 };
++    this.aim = { x: 0, y: 0 };
++    this.morphKey = -1;
++    this.running = false;
++    this.visible = true;
++    this.last = 0;
++
++    // Throws when WebGL is unavailable; the caller falls back to the flat site.
++    this.renderer = new THREE.WebGLRenderer({
++      canvas,
++      antialias: true,
++      alpha: true,
++      powerPreference: 'low-power',
++    });
++    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
++    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
++    this.renderer.toneMappingExposure = 1.05;
++    this.renderer.setClearColor(0x000000, 0);
++
++    this.scene = new THREE.Scene();
++    this.camera = new THREE.PerspectiveCamera(38, 1, 0.1, 200);
++    this.lookAt = new THREE.Vector3();
++
++    // Lit for warm paper: bright ambient, warm key, cool fill, no deep shadows.
++    this.scene.add(new THREE.HemisphereLight(0xffffff, 0xf1e5d8, 2.1));
++    this.key = new THREE.DirectionalLight(0xfff4e6, 2.4);
++    this.key.position.set(4, 6, 8);
++    this.scene.add(this.key);
++    const fill = new THREE.DirectionalLight(0xdce9f7, 1.1);
++    fill.position.set(-6, -2, 4);
++    this.scene.add(fill);
++
++    this.root = new THREE.Group();
++    this.scene.add(this.root);
++
++    this.shapes = buildShapes(this.count);
++    this.build();
++    this.resize();
++    this.bind();
++    this.readScroll();
++    this.progress = this.target;
++    // Nothing has fired an event yet, so the opening frame has to be asked for.
++    this.wake();
++  }
++
++  /* ----------------------------------------------------------------------
++     Geometry
++     ---------------------------------------------------------------------- */
++
++  build() {
++    const count = this.count;
++
++    const geometry = new THREE.IcosahedronGeometry(1, 0);
++    // r185's fragment shader only applies vColor under USE_COLOR, so instance
++    // colours alone are dropped. An all-white vertex colour attribute turns
++    // USE_COLOR on and leaves instanceColor as the only thing tinting a node.
++    const white = new Float32Array(geometry.attributes.position.count * 3).fill(1);
++    geometry.setAttribute('color', new THREE.BufferAttribute(white, 3));
++
++    this.nodes = new THREE.InstancedMesh(
++      geometry,
++      new THREE.MeshStandardMaterial({
++        vertexColors: true,
++        roughness: 0.36,
++        metalness: 0.08,
++      }),
++      count,
++    );
++    this.nodes.frustumCulled = false;
++    this.nodes.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
++    this.nodes.setColorAt(0, new THREE.Color(0xffffff)); // allocates instanceColor
++    this.nodes.instanceColor.setUsage(THREE.DynamicDrawUsage);
++    this.root.add(this.nodes);
++
++    // Per-node size variation, so the network reads with a hierarchy.
++    this.sizes = new Float32Array(count);
++    for (let i = 0; i < count; i++) this.sizes[i] = 0.055 * (0.62 + ((i * 37) % 11) / 9);
++
++    // Each node keeps one accent from the site palette; the beat's tone is mixed
++    // over the top, so colour stays varied but the shot still has a cast.
++    this.accents = new Float32Array(count * 3);
++    const c = new THREE.Color();
++    for (let i = 0; i < count; i++) {
++      c.setHex(PALETTE[i % PALETTE.length], THREE.SRGBColorSpace);
++      this.accents[i * 3] = c.r;
++      this.accents[i * 3 + 1] = c.g;
++      this.accents[i * 3 + 2] = c.b;
++    }
++
++    this.tones = BEATS.map((beat) => new THREE.Color().setHex(beat.tone, THREE.SRGBColorSpace));
++
++    // Edges come from PRODUCTION, the one arrangement where "nearest neighbour"
++    // means something. They stay at zero opacity until the world is a system again.
++    this.pairs = buildEdges(this.shapes[6], 2);
++    const edgePositions = new Float32Array(this.pairs.length * 3);
++    const edgeGeometry = new THREE.BufferGeometry();
++    this.edgeAttribute = new THREE.BufferAttribute(edgePositions, 3);
++    this.edgeAttribute.setUsage(THREE.DynamicDrawUsage);
++    edgeGeometry.setAttribute('position', this.edgeAttribute);
++    this.edges = new THREE.LineSegments(
++      edgeGeometry,
++      new THREE.LineBasicMaterial({ color: 0xc9ae95, transparent: true, opacity: 0 }),
++    );
++    this.edges.frustumCulled = false;
++    this.root.add(this.edges);
++
++    this.buildDust();
++  }
++
++  /** Ambient motes, so the camera has something to move through. */
++  buildDust() {
++    const n = this.tier.dust;
++    const positions = new Float32Array(n * 3);
++    for (let i = 0; i < n; i++) {
++      positions[i * 3] = (Math.random() - 0.5) * 34;
++      positions[i * 3 + 1] = (Math.random() - 0.5) * 22;
++      positions[i * 3 + 2] = (Math.random() - 0.5) * 30;
++    }
++    const geometry = new THREE.BufferGeometry();
++    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
++    this.dust = new THREE.Points(geometry, new THREE.PointsMaterial({
++      color: 0xc2a488,
++      size: 0.045,
++      sizeAttenuation: true,
++      transparent: true,
++      opacity: 0.5,
++      depthWrite: false,
++    }));
++    this.dust.frustumCulled = false;
++    this.scene.add(this.dust);
++  }
++
++  /* ----------------------------------------------------------------------
++     Input
++     ---------------------------------------------------------------------- */
++
++  bind() {
++    this.onScroll = () => { this.readScroll(); this.wake(); };
++    addEventListener('scroll', this.onScroll, { passive: true });
++
++    this.onResize = () => { this.resize(); this.wake(); };
++    addEventListener('resize', this.onResize, { passive: true });
++
++    this.onPointer = (event) => {
++      this.aim.x = (event.clientX / innerWidth - 0.5) * 2;
++      this.aim.y = (event.clientY / innerHeight - 0.5) * 2;
++      this.wake();
++    };
++    addEventListener('pointermove', this.onPointer, { passive: true });
++
++    this.onVisibility = () => {
++      if (document.hidden) this.stop();
++      else this.wake();
++    };
++    document.addEventListener('visibilitychange', this.onVisibility);
++  }
++
++  readScroll() {
++    const max = document.documentElement.scrollHeight - innerHeight;
++    this.target = max > 4 ? clamp(scrollY / max, 0, 1) : 0;
++  }
++
++  resize() {
++    const width = innerWidth;
++    const height = innerHeight;
++    this.camera.aspect = width / height;
++    this.camera.updateProjectionMatrix();
++    this.renderer.setPixelRatio(Math.min(devicePixelRatio || 1, this.tier.dpr));
++    this.renderer.setSize(width, height, false);
++
++    // Where a beat's subject sits relative to the copy. On a wide screen the
++    // layout is two columns, so the subject moves right and the hero copy owns
++    // the left. Once the grid stacks, moving it sideways would put it straight
++    // behind the headline — so it moves up into the stage area instead.
++    const wide = width >= 1000;
++    this.frameX = wide ? 1 : 0;
++    this.frameY = wide ? 0 : 0.5;
++  }
++
++  /* ----------------------------------------------------------------------
++     Loop
++     ---------------------------------------------------------------------- */
++
++  wake() {
++    if (this.running || document.hidden) return;
++    this.running = true;
++    this.last = performance.now();
++    this.tick = (now) => {
++      if (!this.running) return;
++      const keepGoing = this.frame(now);
++      if (keepGoing) this.raf = requestAnimationFrame(this.tick);
++      else { this.running = false; this.raf = 0; }
++    };
++    this.raf = requestAnimationFrame(this.tick);
++  }
++
++  stop() {
++    this.running = false;
++    if (this.raf) cancelAnimationFrame(this.raf);
++    this.raf = 0;
++  }
++
++  /** Returns whether there is still something to animate. */
++  frame(now) {
++    const dt = clamp((now - this.last) / 1000, 0, 0.05);
++    this.last = now;
++
++    // The dolly: scroll sets a target, the camera eases toward it.
++    const damp = 1 - Math.pow(0.0022, dt);
++    this.progress += (this.target - this.progress) * damp;
++    const settling = Math.abs(this.target - this.progress) > 0.00008;
++    if (!settling) this.progress = this.target;
++
++    this.pointer.x += (this.aim.x - this.pointer.x) * (1 - Math.pow(0.02, dt));
++    this.pointer.y += (this.aim.y - this.pointer.y) * (1 - Math.pow(0.02, dt));
++
++    const last = BEATS.length - 1;
++    const p = this.progress * last;
++    const index = clamp(Math.floor(p), 0, last - 1);
++    const t = smooth(clamp(p - index, 0, 1));
++    const a = BEATS[index];
++    const b = BEATS[index + 1];
++
++    // Set edge opacity first: writeEdges skips the buffer entirely when the
++    // edges are invisible, and it should be reading this frame's value.
++    this.edges.material.opacity = mix(a.edges, b.edges, t);
++
++    // Only rewrite buffers when the morph has actually moved.
++    const key = index + t;
++    if (key !== this.morphKey) {
++      this.morphKey = key;
++      this.writeNodes(index, t, a, b);
++      this.writeEdges();
++    }
++
++    const spinRate = mix(a.spin, b.spin, t);
++    this.spin += spinRate * dt;
++    this.root.rotation.y = this.spin + this.pointer.x * 0.16;
++    this.root.rotation.x = Math.sin(this.spin * 0.6) * 0.05 - this.pointer.y * 0.08;
++    const framing = mix(a.framing, b.framing, t);
++    this.root.position.x = framing * this.frameX;
++    this.root.position.y = framing * this.frameY;
++
++    this.camera.fov = mix(a.camera.fov, b.camera.fov, t);
++    this.camera.updateProjectionMatrix();
++    this.camera.position.set(
++      mix(a.camera.pos[0], b.camera.pos[0], t) + this.pointer.x * 0.22,
++      mix(a.camera.pos[1], b.camera.pos[1], t) - this.pointer.y * 0.16,
++      mix(a.camera.pos[2], b.camera.pos[2], t),
++    );
++    this.lookAt.set(
++      mix(a.camera.look[0], b.camera.look[0], t),
++      mix(a.camera.look[1], b.camera.look[1], t),
++      mix(a.camera.look[2], b.camera.look[2], t),
++    );
++    this.camera.lookAt(this.lookAt);
++
++    this.dust.rotation.y = -this.spin * 0.25;
++
++    this.renderer.render(this.scene, this.camera);
++
++    // MEASUREMENT locks off completely, so a parked camera there costs nothing.
++    const drifting = this.tier.idleSpin
++      && (spinRate > 0.001 || Math.abs(this.aim.x - this.pointer.x) > 0.002);
++    return settling || drifting;
++  }
++
++  /** Lerp every node between the two beats that bracket the current scroll. */
++  writeNodes(index, t, a, b) {
++    const from = this.shapes[index];
++    const to = this.shapes[index + 1];
++    const matrix = this.nodes.instanceMatrix.array;
++    const colors = this.nodes.instanceColor.array;
++    const scale = mix(a.nodeScale, b.nodeScale, t);
++
++    const ta = this.tones[index];
++    const tb = this.tones[index + 1];
++    const tr = mix(ta.r, tb.r, t);
++    const tg = mix(ta.g, tb.g, t);
++    const tbl = mix(ta.b, tb.b, t);
++
++    for (let i = 0; i < this.count; i++) {
++      const p = i * 3;
++      const m = i * 16;
++      const s = this.sizes[i] * scale;
++
++      // Only the diagonal and the translation are ever non-zero, so the rest of
++      // the matrix keeps the zeroes it was allocated with.
++      matrix[m] = s;
++      matrix[m + 5] = s;
++      matrix[m + 10] = s;
++      matrix[m + 12] = mix(from[p], to[p], t);
++      matrix[m + 13] = mix(from[p + 1], to[p + 1], t);
++      matrix[m + 14] = mix(from[p + 2], to[p + 2], t);
++      matrix[m + 15] = 1;
++
++      colors[p] = mix(this.accents[p], tr, 0.58);
++      colors[p + 1] = mix(this.accents[p + 1], tg, 0.58);
++      colors[p + 2] = mix(this.accents[p + 2], tbl, 0.58);
++    }
++
++    this.nodes.instanceMatrix.needsUpdate = true;
++    this.nodes.instanceColor.needsUpdate = true;
++  }
++
++  /** Edges follow wherever the nodes currently are, so they stretch through a morph. */
++  writeEdges() {
++    if (this.edges.material.opacity < 0.005) return;
++    const matrix = this.nodes.instanceMatrix.array;
++    const out = this.edgeAttribute.array;
++    for (let e = 0; e < this.pairs.length; e++) {
++      const m = this.pairs[e] * 16;
++      const o = e * 3;
++      out[o] = matrix[m + 12];
++      out[o + 1] = matrix[m + 13];
++      out[o + 2] = matrix[m + 14];
++    }
++    this.edgeAttribute.needsUpdate = true;
++  }
++
++  dispose() {
++    this.stop();
++    removeEventListener('scroll', this.onScroll);
++    removeEventListener('resize', this.onResize);
++    removeEventListener('pointermove', this.onPointer);
++    document.removeEventListener('visibilitychange', this.onVisibility);
++    this.scene.traverse((object) => {
++      object.geometry?.dispose();
++      const material = object.material;
++      if (Array.isArray(material)) material.forEach((m) => m.dispose());
++      else material?.dispose();
++    });
++    this.renderer.dispose();
++  }
++}
+-- 
+2.43.0
+

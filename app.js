@@ -1,6 +1,6 @@
 import {
   achievements, certifications, chapters, contactHref, heroMeta, links,
-  marquee, profile, projects, toolbox,
+  marquee, profile, projects, research, toolbox,
 } from './data.js';
 import { renderDiagram, heroFallback } from './diagrams.js';
 import { startMotion } from './motion.js';
@@ -26,6 +26,11 @@ const ICONS = {
   mail: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/>',
   arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
   download: '<path d="M12 3v12M7 11l5 5 5-5M4 20h16"/>',
+  external: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+  quote: '<path d="M7 7h4v4c0 3-1.5 5-4 6M15 7h4v4c0 3-1.5 5-4 6"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  doc: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
+    lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
 };
 
 const icon = (name, size = 17) => `
@@ -52,7 +57,7 @@ function renderHero() {
   $('#hero-contact').setAttribute('href', contactHref);
 
   $('#hero-meta').innerHTML = heroMeta.map((item) => `
-    <div><dt>${item.label}</dt><dd>${item.value}</dd></div>
+    <div><dt>${item.label}</dt><dd>${item.href ? `<a href="${item.href}">${item.value}</a>` : item.value}</dd></div>
   `).join('');
 
   $('#hero-fallback').innerHTML = heroFallback();
@@ -66,18 +71,43 @@ function renderHero() {
    Work
    ========================================================================== */
 
+/** A browser window around a live screenshot — the URL bar is the real host. */
+const browserShot = (project, src, { lazy = true } = {}) => `
+  <div class="shot">
+    <div class="shot-bar" aria-hidden="true">
+      <span class="shot-dots"><i></i><i></i><i></i></span>
+      <span class="shot-url">${icon('lock', 11)} ${project.live.host}</span>
+      <span class="live-pill"><span class="live-dot"></span>Live</span>
+    </div>
+    <img src="${src}" alt="Screenshot of ${project.title} running at ${project.live.host}"
+         width="1280" height="800" decoding="async"${lazy ? ' loading="lazy"' : ''}>
+  </div>
+`;
+
+const liveButton = (project, cls = 'btn-primary') => `
+  <a class="btn ${cls} btn-live" href="${project.live.url}" target="_blank" rel="noopener">
+    Visit live site ${icon('external', 16)}
+  </a>
+`;
+
 function renderWork() {
   $('#work-list').innerHTML = projects.map((project, i) => `
-    <article class="project tone-${project.tone} reveal" style="--delay:${i * 60}ms">
+    <article class="project tone-${project.tone}${project.live ? ' is-live' : ''} reveal"
+             style="--delay:${i * 60}ms">
       <div class="project-body">
         <div class="project-top">
           <span class="project-index">${String(i + 1).padStart(2, '0')}</span>
+          ${project.live ? '<span class="project-live"><span class="live-dot"></span>Live in production</span>' : ''}
           <span class="project-year">${project.year}</span>
         </div>
         <h3>${project.title}</h3>
         <p class="project-role">${project.role}</p>
         <p class="project-question">${project.question}</p>
         <p class="project-desc">${project.summary}</p>
+        ${project.stats ? `
+          <dl class="project-stats">
+            ${project.stats.map((stat) => `<div><dt>${stat.label}</dt><dd>${stat.value}</dd></div>`).join('')}
+          </dl>` : ''}
         <div class="project-tags">
           ${project.tools.slice(0, 5).map((tool, t) => `<span class="tag" style="--i:${t}">${tool}</span>`).join('')}
           ${project.tools.length > 5
@@ -85,15 +115,102 @@ function renderWork() {
             : ''}
         </div>
         <div class="project-actions">
+          ${project.live ? liveButton(project) : ''}
           <button class="btn btn-ghost" type="button" data-project="${project.id}">
-            Read the case study ${icon('arrow', 16)}
+            ${project.live ? 'How it works' : 'Read the case study'} ${icon('arrow', 16)}
           </button>
         </div>
       </div>
-      <div class="project-visual">${renderDiagram(project.diagram)}</div>
+      ${project.live ? `
+        <a class="project-visual project-visual--shot" href="${project.live.url}" target="_blank"
+           rel="noopener" tabindex="-1" aria-hidden="true">
+          ${browserShot(project, project.shots[0])}
+          ${project.shots[1] ? `<div class="shot shot-back"><img src="${project.shots[1]}" alt="" width="1280" height="800" loading="lazy" decoding="async"></div>` : ''}
+        </a>`
+        : `<div class="project-visual">${renderDiagram(project.diagram)}</div>`}
     </article>
   `).join('');
 }
+
+/* ==========================================================================
+   Research
+   ========================================================================== */
+
+function renderResearch() {
+  const author = (a) => (typeof a === 'string'
+    ? `<span>${a}</span>`
+    : `<span class="me" title="That's me">${a.name}</span>`);
+
+  $('#paper-list').innerHTML = research.map((paper, i) => `
+    <article class="paper tone-${paper.tone} reveal" style="--delay:${i * 80}ms">
+      <div class="paper-cover">
+        <div class="paper-badges">
+          <span class="paper-ieee">IEEE</span>
+          <span class="paper-kind">${paper.kind}</span>
+        </div>
+        <div class="paper-diagram" aria-hidden="true">${renderDiagram(paper.diagram)}</div>
+        <p class="paper-venue-big">${paper.venue}</p>
+        <p class="paper-venue-full">${paper.venueFull} · ${paper.place}</p>
+      </div>
+
+      <div class="paper-body">
+        <p class="paper-q">${paper.question}</p>
+        <h3 class="paper-title">
+          <a href="${paper.links.ieee}" target="_blank" rel="noopener">${paper.title}</a>
+        </h3>
+        <p class="paper-authors" aria-label="Authors">${paper.authors.map(author).join('')}</p>
+        <p class="paper-abstract">${paper.abstract}</p>
+        <ul class="paper-points">
+          ${paper.points.map((point) => `<li>${icon('check', 15)}<span>${point}</span></li>`).join('')}
+        </ul>
+        <div class="project-tags">
+          ${paper.keywords.map((k, t) => `<span class="tag" style="--i:${t}">${k}</span>`).join('')}
+        </div>
+        <dl class="paper-meta">
+          <div><dt>Presented</dt><dd>${paper.presented}</dd></div>
+          <div><dt>Published</dt><dd>${paper.published}</dd></div>
+          <div><dt>Pages</dt><dd>${paper.pages}</dd></div>
+          <div class="paper-doi"><dt>DOI</dt><dd><a href="https://doi.org/${paper.doi}" target="_blank" rel="noopener">${paper.doi}</a></dd></div>
+        </dl>
+        <div class="paper-actions">
+          <a class="btn btn-primary" href="${paper.links.ieee}" target="_blank" rel="noopener">
+            ${icon('doc', 16)} Read on IEEE Xplore
+          </a>
+          ${paper.links.researchgate ? `
+            <a class="btn btn-ghost" href="${paper.links.researchgate}" target="_blank" rel="noopener">
+              ResearchGate ${icon('external', 15)}
+            </a>` : ''}
+          <a class="btn btn-ghost" href="${paper.links.scholar}" target="_blank" rel="noopener">
+            Semantic Scholar ${icon('external', 15)}
+          </a>
+          <button class="btn btn-ghost btn-cite" type="button" data-cite="${paper.id}" aria-label="Copy citation for ${paper.title}">
+            ${icon('quote', 15)} <span aria-live="polite">Cite</span>
+          </button>
+        </div>
+      </div>
+    </article>
+  `).join('');
+}
+
+// Copies an IEEE-style reference. Clipboard needs a secure context; when it is
+// unavailable the button says so rather than failing silently.
+document.addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-cite]');
+  if (!button) return;
+  const paper = research.find((p) => p.id === button.dataset.cite);
+  const label = button.querySelector('span');
+  try {
+    await navigator.clipboard.writeText(paper.cite);
+    label.textContent = 'Citation copied';
+    button.classList.add('is-done');
+  } catch {
+    label.textContent = 'Copy failed';
+  }
+  setTimeout(() => {
+    label.textContent = 'Cite';
+    button.classList.remove('is-done');
+  }, 2200);
+});
 
 /* ==========================================================================
    Journey, toolbox, proof
@@ -164,6 +281,7 @@ function renderContact() {
 
 renderHero();
 renderWork();
+renderResearch();
 renderJourney();
 renderToolbox();
 renderProof();
@@ -190,7 +308,21 @@ function openProject(id, trigger) {
       <p class="project-role">${project.role}</p>
       <p class="sheet-q">${project.question}</p>
 
-      <div class="sheet-flow" aria-label="Request flow">
+      ${project.live ? `
+        <div class="sheet-live">
+          ${liveButton(project)}
+          <span class="sheet-host">${project.live.host}</span>
+        </div>
+        <div class="sheet-gallery${project.shots.length > 1 ? ' two' : ''}">
+          ${project.shots.map((src) => browserShot(project, src, { lazy: false })).join('')}
+        </div>` : ''}
+
+      ${project.stats ? `
+        <dl class="project-stats sheet-stats">
+          ${project.stats.map((stat) => `<div><dt>${stat.label}</dt><dd>${stat.value}</dd></div>`).join('')}
+        </dl>` : ''}
+
+      <div class="sheet-flow" aria-label="How it flows">
         ${project.flow.map((step, i) => `
           ${i ? '<i aria-hidden="true">→</i>' : ''}<span>${step}</span>
         `).join('')}
@@ -328,13 +460,6 @@ async function mountWorld() {
 
     world = new World($('#world'), { tier });
     document.body.classList.add('world-on');
-
-    // Push 1 wires the two ends of the route. The hops between them are
-    // travelled but not yet anchored, so their sections stay in normal flow.
-    world.bindAnchors({
-      dispatch: $('#hop-dispatch'),
-      ok: $('#hop-ok'),
-    });
   } catch (error) {
     console.warn('The world could not start; falling back to the flat site.', error);
     document.body.classList.add('no-webgl');

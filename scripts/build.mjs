@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const output = resolve(root, 'dist');
 
-const MODULES = ['anchor.js', 'app.js', 'data.js', 'diagrams.js', 'motion.js', 'route.js', 'world.js'];
+const MODULES = ['app.js', 'beats.js', 'data.js', 'diagrams.js', 'motion.js', 'world.js'];
 const FILES = [...MODULES, 'index.html', 'styles.css', 'resume.html'];
 
 for (const name of MODULES) {
